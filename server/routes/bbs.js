@@ -1,21 +1,26 @@
 import express from 'express';
 import BBSReport from '../models/BBSReport.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
+import NumberGenerator from '../utils/numberGenerator.js';
+import { 
+  validateBBSCreation, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
-// Generate BBS report number
-const generateReportNumber = (companyId) => {
-  const date = new Date();
-  const year = date.getFullYear().toString().substr(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-  return `BBS${year}${month}${day}${random}`;
-};
 
 // Get all BBS reports for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, status, type, plantId } = req.query;
@@ -47,14 +52,20 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 });
 
 // Create new BBS report
-router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validateBBSCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const reportData = {
       ...req.body,
       companyId,
       observer: req.user._id,
-      reportNumber: generateReportNumber(companyId)
+      reportNumber: await NumberGenerator.generateNumber(companyId, 'bbs')
     };
 
     const report = new BBSReport(reportData);

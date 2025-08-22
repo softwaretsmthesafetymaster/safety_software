@@ -2,11 +2,23 @@ import express from 'express';
 import Company from '../models/Company.js';
 import User from '../models/User.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { 
+  validateCompanyCreation, 
+  validateCompanyUpdate, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
 // Get all companies (platform owner only)
-router.get('/', authenticate, authorize(['platform_owner']), async (req, res) => {
+router.get('/', 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  authorize(['platform_owner']), 
+  async (req, res) => {
   try {
     const companies = await Company.find()
       .select('name logo industry subscription isActive createdAt')
@@ -19,7 +31,10 @@ router.get('/', authenticate, authorize(['platform_owner']), async (req, res) =>
 });
 
 // Create new company
-router.post('/',  async (req, res) => {
+router.post('/', 
+  validateCompanyCreation, 
+  validate, 
+  async (req, res) => {
   try {
     const companyData = req.body;
     
@@ -95,7 +110,12 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Update company
-router.patch('/:id', authenticate, async (req, res) => {
+router.patch('/:id', 
+  validateObjectId('id'), 
+  validateCompanyUpdate, 
+  validate, 
+  authenticate, 
+  async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;

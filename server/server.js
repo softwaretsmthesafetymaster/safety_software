@@ -16,6 +16,7 @@ import plantRoutes from './routes/plants.js';
 import userRoutes from './routes/users.js';
 import notificationRoutes from './routes/notifications.js';
 import paymentRoutes from './routes/payment.js';
+import aiRoutes from './routes/ai.js';
 import emailService from './services/emailService.js';
 import notificationService from './services/notificationService.js';
 import reminderService from './services/reminderService.js';
@@ -46,6 +47,7 @@ app.use('/api/plants', plantRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

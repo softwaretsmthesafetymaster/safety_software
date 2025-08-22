@@ -4,22 +4,29 @@ import Company from '../models/Company.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
 import notificationService from '../services/notificationService.js';
 import reminderService from '../services/reminderService.js';
+import NumberGenerator from '../utils/numberGenerator.js';
+import { 
+  validatePermitCreation, 
+  validatePermitApproval, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
-// Generate permit number
-const generatePermitNumber = (companyId) => {
-  const date = new Date();
-  const year = date.getFullYear().toString().substr(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `PTW${year}${month}${random}`;
-};
 
 /**
  * GET all permits for a company
  */
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, status, plantId, type } = req.query;
@@ -53,7 +60,13 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 /**
  * CREATE new permit
  */
-router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validatePermitCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const company = await Company.findById(companyId);
@@ -70,7 +83,7 @@ router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) =>
       ...req.body,
       companyId,
       requestedBy: req.user._id, // always enforce
-      permitNumber: await generatePermitNumber(company), // proper format
+      permitNumber: await NumberGenerator.generateNumber(companyId, 'ptw'),
       approvals: approvalConfig.map((step, index) => ({
         step: index + 1,
         role: step.role,
@@ -107,7 +120,13 @@ router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) =>
 /**
  * GET permit by ID
  */
-router.get('/:companyId/:id', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId/:id', 
+  validateCompanyId, 
+  validateObjectId('id'), 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId, id } = req.params;
 
@@ -194,7 +213,14 @@ router.post('/:companyId/:id/submit', authenticate, checkCompanyAccess, async (r
 /**
  * APPROVE / REJECT permit
  */
-router.post('/:companyId/:id/approve', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId/:id/approve', 
+  validateCompanyId, 
+  validateObjectId('id'), 
+  validatePermitApproval, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId, id } = req.params;
     const { decision, comments } = req.body;

@@ -1,20 +1,27 @@
 import express from 'express';
 import HIRA from '../models/HIRA.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
+import NumberGenerator from '../utils/numberGenerator.js';
+import { 
+  validateHIRACreation, 
+  validateHazardAssessment, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
-// Generate HIRA assessment number
-const generateAssessmentNumber = (companyId) => {
-  const date = new Date();
-  const year = date.getFullYear().toString().substr(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `HIRA${year}${month}${random}`;
-};
 
 // Get all HIRA assessments for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, status, plantId } = req.query;
@@ -45,14 +52,20 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 });
 
 // Create new HIRA assessment
-router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validateHIRACreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const assessmentData = {
       ...req.body,
       companyId,
       assessor: req.user._id,
-      assessmentNumber: generateAssessmentNumber(companyId)
+      assessmentNumber: await NumberGenerator.generateNumber(companyId, 'hira')
     };
 
     const assessment = new HIRA(assessmentData);

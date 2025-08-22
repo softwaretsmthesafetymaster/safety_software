@@ -1,11 +1,25 @@
 import express from 'express';
 import Plant from '../models/Plant.js';
 import { authenticate, checkCompanyAccess, authorize } from '../middleware/auth.js';
+import { 
+  validatePlantCreation, 
+  validateAreaCreation, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
 // Get all plants for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, search } = req.query;
@@ -37,7 +51,14 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 });
 
 // Create new plant
-router.post('/:companyId', authenticate, checkCompanyAccess, authorize(['company_owner', 'plant_head']), async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validatePlantCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  authorize(['company_owner', 'plant_head']), 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const plantData = {
@@ -117,7 +138,15 @@ router.delete('/:companyId/:id', authenticate, checkCompanyAccess, authorize(['c
 });
 
 // Add area to plant
-router.post('/:companyId/:id/areas', authenticate, checkCompanyAccess, authorize(['company_owner', 'plant_head']), async (req, res) => {
+router.post('/:companyId/:id/areas', 
+  validateCompanyId, 
+  validateObjectId('id'), 
+  validateAreaCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  authorize(['company_owner', 'plant_head']), 
+  async (req, res) => {
   try {
     const { companyId, id } = req.params;
     const areaData = req.body;

@@ -1,20 +1,27 @@
 import express from 'express';
 import Audit from '../models/Audit.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
+import NumberGenerator from '../utils/numberGenerator.js';
+import { 
+  validateAuditCreation, 
+  validateChecklistUpdate, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
-// Generate audit number
-const generateAuditNumber = (companyId) => {
-  const date = new Date();
-  const year = date.getFullYear().toString().substr(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `AUD${year}${month}${random}`;
-};
 
 // Get all audits for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, status, type, plantId } = req.query;
@@ -46,14 +53,20 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 });
 
 // Create new audit
-router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validateAuditCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const auditData = {
       ...req.body,
       companyId,
       auditor: req.user._id,
-      auditNumber: generateAuditNumber(companyId)
+      auditNumber: await NumberGenerator.generateNumber(companyId, 'audit')
     };
 
     const audit = new Audit(auditData);

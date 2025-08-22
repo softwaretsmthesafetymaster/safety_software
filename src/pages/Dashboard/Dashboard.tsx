@@ -342,22 +342,31 @@ const Dashboard: React.FC = () => {
                 audit: { name: 'Safety Audits', icon: CheckSquare, color: 'bg-indigo-500', href: '/audit' }
               }[moduleKey];
           
-      
-
               if (!moduleInfo) return null;
+            
               return (
-                <Link to={moduleInfo.href} key={moduleKey} className="flex items-center p-4 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow">
-                  <div className={`p-3 rounded-full ${moduleInfo.color} text-white`}>
-                    <moduleInfo.icon className="h-6 w-6" />
+              <Link 
+                to={moduleInfo.href} 
+                key={moduleKey} 
+                className="group flex items-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
+              >
+                <div className={`p-3 rounded-lg ${moduleInfo.color} text-white group-hover:scale-110 transition-transform duration-200`}>
+                  <moduleInfo.icon className="h-8 w-8" />
                   </div>
-                  <span className="ml-4 text-gray-900 dark:text-white font-medium">
+                <div className="ml-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {moduleInfo.name}
-                  </span>
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Access {moduleInfo.name.toLowerCase()} module
+                  </p>
+                </div>
+                <ArrowRight className="ml-auto h-5 w-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
                 </Link>
               );
             }
           )}
-          </div>  
+          </div>
         </Card>
       </motion.div>
     </div>

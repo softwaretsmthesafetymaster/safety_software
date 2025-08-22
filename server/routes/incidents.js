@@ -3,21 +3,27 @@ import Incident from '../models/Incident.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
 import notificationService from '../services/notificationService.js';
 import reminderService from '../services/reminderService.js';
+import NumberGenerator from '../utils/numberGenerator.js';
+import { 
+  validateIncidentCreation, 
+  validateInvestigationUpdate, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
-// Generate incident number
-const generateIncidentNumber = (companyId) => {
-  const date = new Date();
-  const year = date.getFullYear().toString().substr(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-  return `INC${year}${month}${day}${random}`;
-};
 
 // Get all incidents for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, status, severity, type } = req.query;
@@ -49,14 +55,20 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 });
 
 // Create new incident
-router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validateIncidentCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const incidentData = {
       ...req.body,
       companyId,
       reportedBy: req.user._id,
-      incidentNumber: generateIncidentNumber(companyId)
+      incidentNumber: await NumberGenerator.generateNumber(companyId, 'ims')
     };
 
     const incident = new Incident(incidentData);
@@ -159,7 +171,14 @@ router.post('/:companyId/:id/assign', authenticate, checkCompanyAccess, async (r
 });
 
 // Submit investigation findings
-router.post('/:companyId/:id/investigation', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId/:id/investigation', 
+  validateCompanyId, 
+  validateObjectId('id'), 
+  validateInvestigationUpdate, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId, id } = req.params;
     const { findings, rootCause, fiveWhys, fishbone } = req.body;

@@ -230,6 +230,67 @@ const companySchema = new mongoose.Schema({
         }]
       }
     },
+    numbering: {
+      ptw: {
+        prefix: { type: String, default: 'PTW' },
+        format: { type: String, default: 'YYMMXXX' },
+        startNumber: { type: Number, default: 1 }
+      },
+      ims: {
+        prefix: { type: String, default: 'INC' },
+        format: { type: String, default: 'YYMMDDXX' },
+        startNumber: { type: Number, default: 1 }
+      },
+      hazop: {
+        prefix: { type: String, default: 'HAZ' },
+        format: { type: String, default: 'YYMMXXX' },
+        startNumber: { type: Number, default: 1 }
+      },
+      hira: {
+        prefix: { type: String, default: 'HIRA' },
+        format: { type: String, default: 'YYMMXXX' },
+        startNumber: { type: Number, default: 1 }
+      },
+      bbs: {
+        prefix: { type: String, default: 'BBS' },
+        format: { type: String, default: 'YYMMDDXX' },
+        startNumber: { type: Number, default: 1 }
+      },
+      audit: {
+        prefix: { type: String, default: 'AUD' },
+        format: { type: String, default: 'YYMMXXX' },
+        startNumber: { type: Number, default: 1 }
+      }
+    },
+    sla: {
+      ptw: {
+        approvalTime: { type: Number, default: 24 }, // hours
+        reminderBefore: { type: Number, default: 2 }, // hours
+        expiryReminder: { type: Number, default: 24 } // hours before expiry
+      },
+      ims: {
+        investigationTime: { type: Number, default: 72 }, // hours
+        actionTime: { type: Number, default: 168 }, // hours (1 week)
+        closureTime: { type: Number, default: 720 } // hours (30 days)
+      },
+      hazop: {
+        sessionReminder: { type: Number, default: 24 }, // hours before session
+        completionTime: { type: Number, default: 2160 } // hours (90 days)
+      },
+      hira: {
+        reviewTime: { type: Number, default: 168 }, // hours (1 week)
+        approvalTime: { type: Number, default: 72 } // hours
+      },
+      bbs: {
+        reviewTime: { type: Number, default: 24 }, // hours
+        closureTime: { type: Number, default: 168 } // hours (1 week)
+      },
+      audit: {
+        preparationTime: { type: Number, default: 168 }, // hours (1 week)
+        completionTime: { type: Number, default: 720 }, // hours (30 days)
+        actionTime: { type: Number, default: 2160 } // hours (90 days)
+      }
+    },
     theme: {
       primaryColor: { type: String, default: '#3b82f6' },
       secondaryColor: { type: String, default: '#64748b' },

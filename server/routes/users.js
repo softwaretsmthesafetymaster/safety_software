@@ -1,11 +1,25 @@
 import express from 'express';
 import User from '../models/User.js';
 import { authenticate, checkCompanyAccess, authorize } from '../middleware/auth.js';
+import { 
+  validateUserCreation, 
+  validateUserUpdate, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
 // Get all users for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, role, search, plantId } = req.query;
@@ -41,7 +55,14 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 });
 
 // Create new user
-router.post('/:companyId', authenticate, checkCompanyAccess, authorize(['company_owner', 'plant_head']), async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validateUserCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  authorize(['company_owner', 'plant_head']), 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const userData = {
@@ -93,7 +114,14 @@ router.get('/:companyId/:id', authenticate, checkCompanyAccess, async (req, res)
 });
 
 // Update user
-router.patch('/:companyId/:id', authenticate, checkCompanyAccess, async (req, res) => {
+router.patch('/:companyId/:id', 
+  validateCompanyId, 
+  validateObjectId('id'), 
+  validateUserUpdate, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId, id } = req.params;
     const updates = req.body;

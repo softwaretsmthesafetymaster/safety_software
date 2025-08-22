@@ -8,6 +8,7 @@ import {
   Users,
   Workflow,
   Shield,
+  Clock,
   Bell
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';

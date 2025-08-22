@@ -1,20 +1,27 @@
 import express from 'express';
 import HAZOP from '../models/HAZOP.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
+import NumberGenerator from '../utils/numberGenerator.js';
+import { 
+  validateHAZOPCreation, 
+  validateNodeCreation, 
+  validateCompanyId, 
+  validateObjectId, 
+  validatePagination,
+  validate 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
-// Generate HAZOP study number
-const generateStudyNumber = (companyId) => {
-  const date = new Date();
-  const year = date.getFullYear().toString().substr(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `HAZ${year}${month}${random}`;
-};
 
 // Get all HAZOP studies for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.get('/:companyId', 
+  validateCompanyId, 
+  validatePagination, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const { page = 1, limit = 10, status, plantId } = req.query;
@@ -45,14 +52,20 @@ router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => 
 });
 
 // Create new HAZOP study
-router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId', 
+  validateCompanyId, 
+  validateHAZOPCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId } = req.params;
     const studyData = {
       ...req.body,
       companyId,
       facilitator: req.user._id,
-      studyNumber: generateStudyNumber(companyId)
+      studyNumber: await NumberGenerator.generateNumber(companyId, 'hazop')
     };
 
     const study = new HAZOP(studyData);
@@ -141,7 +154,14 @@ router.post('/:companyId/:id/sessions', authenticate, checkCompanyAccess, async 
 });
 
 // Add node to HAZOP study
-router.post('/:companyId/:id/nodes', authenticate, checkCompanyAccess, async (req, res) => {
+router.post('/:companyId/:id/nodes', 
+  validateCompanyId, 
+  validateObjectId('id'), 
+  validateNodeCreation, 
+  validate, 
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
   try {
     const { companyId, id } = req.params;
     const nodeData = req.body;
