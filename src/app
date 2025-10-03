@@ -1,0 +1,117 @@
+import React, { useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { store } from './store/store';
+import { useAppSelector, useAppDispatch } from './hooks/redux';
+import { fetchUserProfile } from './store/slices/authSlice';
+import Layout from './components/Layout/Layout';
+import LandingPage from './pages/Landing/LandingPage';
+import Register from './pages/Auth/Register';
+import PaymentPage from './pages/Payment/PaymentPage';
+import Login from './pages/Auth/Login';
+import Dashboard from './pages/Dashboard/Dashboard';
+import PermitDashboard from './pages/PTW/PermitDashboard';
+import PermitList from './pages/PTW/PermitList';
+import PermitForm from './pages/PTW/PermitForm';
+import PermitDetails from './pages/PTW/PermitDetails';
+import IncidentDashboard from './pages/IMS/IncidentDashboard';
+import IncidentList from './pages/IMS/IncidentList';
+import IncidentForm from './pages/IMS/IncidentForm';
+import IncidentDetails from './pages/IMS/IncidentDetails';
+import HAZOPDashboard from './pages/HAZOP/HAZOPDashboard';
+import LoadingSpinner from './components/UI/LoadingSpinner';
+
+const PrivateRoute = ({ children }: { children: JSX.Element }) => {
+  const { isAuthenticated, user } = useSelector((state: any) => state.auth);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  if (!user?.isPaid) {
+    return <Navigate to="/payment" />;
+  }
+
+  return children;
+};
+
+
+function App() {
+  return (
+    <Provider store={store}>
+      <Router>
+        <AppContent />
+      </Router>
+    </Provider>
+  );
+}
+
+function AppContent() {
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, isLoading, token } = useAppSelector((state) => state.auth);
+  const { theme } = useAppSelector((state) => state.ui);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    if (token && !isAuthenticated) {
+      dispatch(fetchUserProfile());
+    }
+  }, [dispatch, token, isAuthenticated]);
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/register" element={<Register />} />
+        
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+  
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        
+        <Route path="/dashboard" element={<PrivateRoute><Dashboard/></PrivateRoute>} />
+        
+        {/* PTW Routes */}
+        <Route path="/ptw" element={<PermitDashboard />} />
+        <Route path="/ptw/permits" element={<PermitList />} />
+        <Route path="/ptw/permits/new" element={<PermitForm />} />
+        <Route path="/ptw/permits/:id" element={<PermitDetails />} />
+        <Route path="/ptw/permits/:id/edit" element={<PermitForm />} />
+        
+        {/* IMS Routes */}
+        <Route path="/ims" element={<IncidentDashboard />} />
+        <Route path="/ims/incidents" element={<IncidentList />} />
+        <Route path="/ims/incidents/new" element={<IncidentForm />} />
+        <Route path="/ims/incidents/:id" element={<IncidentDetails />} />
+        <Route path="/ims/incidents/:id/edit" element={<IncidentForm />} />
+        
+        {/* HAZOP Routes */}
+        <Route path="/hazop" element={<HAZOPDashboard />} />
+        
+        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Layout>
+  );
+}
+
+export default App;
