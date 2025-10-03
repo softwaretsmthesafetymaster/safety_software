@@ -95,7 +95,7 @@ const UserManagement: React.FC = () => {
         'worker',
         'contractor',
         'hod',
-        'safety',
+        'safety_incharge',
         'admin',
         'manager',
         'plant_head'
@@ -121,7 +121,7 @@ const UserManagement: React.FC = () => {
     worker: 'Worker',
     contractor: 'Contractor',
     hod: 'Head of Department',
-    safety: 'Safety Officer',
+    safety_incharge: 'Safety Officer',
     admin: 'Administrator',
     manager: 'Manager',
     plant_head: 'Plant Head',

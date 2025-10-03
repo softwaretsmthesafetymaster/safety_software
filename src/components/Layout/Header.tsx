@@ -42,6 +42,11 @@ const Header: React.FC = () => {
   const primaryColor = branding?.primaryColor || '#3b82f6';
   const companyDisplayName = branding?.companyName || currentCompany?.name || 'SafetyPro';
 
+  const initials = companyDisplayName
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+
   const handleMenuToggle = () => {
     dispatch(toggleSidebar());
   };
@@ -74,16 +79,19 @@ const Header: React.FC = () => {
               />
             ) : (
               <div 
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                className="h-8 w-8 px-6 rounded-lg flex items-center justify-center text-white font-bold text-sm"
                 style={{ backgroundColor: primaryColor }}
               >
-                {companyDisplayName.charAt(0).toUpperCase()}
+                {initials}
               </div>
             )}
             <div>
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {!mobileView && <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {companyDisplayName}
-              </h1>
+              </h1>}
+              {mobileView && <h1 className="text-lg font-semibold text-gray-900 dark:text-white text-center">
+                {initials}
+              </h1>}
               {!mobileView && <p className="text-xs text-gray-500 dark:text-gray-400">
                 Safety Management System
               </p>}
