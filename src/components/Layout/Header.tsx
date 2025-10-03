@@ -47,14 +47,14 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+    <header className="glass-strong border-b border-gray-200/50 dark:border-gray-700/50 shadow-smooth sticky top-0 z-10">
       <div className="max-w-7xl mx-auto px-2 md:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Mobile menu button */}
           <div className="flex items-center">
             <button
               type="button"
-              className="inline-flex items-center justify-center p-1 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 mobile-menu-button"
+              className="inline-flex items-center justify-center p-1 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100/50 dark:hover:bg-gray-700/50 smooth-transition focus-ring mobile-menu-button"
               aria-controls="mobile-menu"
               aria-expanded="false"
               onClick={handleMenuToggle}
@@ -99,7 +99,7 @@ const Header: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search permits, incidents, audits..."
-                className="block w-full pl-10 pr-64 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="block w-full pl-10 pr-64 py-2.5 border border-gray-300/50 dark:border-gray-600/50 rounded-lg leading-5 bg-white/50 dark:bg-gray-700/50 backdrop-blur-sm placeholder-gray-500 dark:placeholder-gray-400 focus-ring text-sm smooth-transition"
                 style={{ borderColor: theme === 'light' ? primaryColor + '40' : undefined }}
               />
             </div>
@@ -110,7 +110,7 @@ const Header: React.FC = () => {
             {/* Theme Toggle */}
             <button
               onClick={handleThemeToggle}
-              className="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-full"
+              className="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus-ring rounded-full smooth-transition hover:bg-gray-100/50 dark:hover:bg-gray-700/50"
             >
               {theme === 'light' ? (
                 <Moon className="h-5 w-5" />
@@ -124,7 +124,7 @@ const Header: React.FC = () => {
 
             {/* User Menu */}
             <div className="relative group">
-              <button className="flex items-center space-x-3 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-lg">
+              <button className="flex items-center space-x-3 p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus-ring rounded-lg smooth-transition hover:bg-gray-100/50 dark:hover:bg-gray-700/50">
                 <div 
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm"
                   style={{ backgroundColor: primaryColor }}
@@ -150,7 +150,7 @@ const Header: React.FC = () => {
               </button>
 
               {/* Dropdown */}
-              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-200 dark:border-gray-700">
+              <div className="absolute right-0 mt-2 w-56 glass-card rounded-lg shadow-smooth-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible smooth-transition border border-gray-200/50 dark:border-gray-700/50">
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {user?.name}

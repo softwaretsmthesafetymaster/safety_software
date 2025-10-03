@@ -42,12 +42,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 overflow-hidden">
       {/* Sidebar - Desktop */}
       <div className="hidden lg:block sidebar-container">
         <Sidebar isMobile={false} />
       </div>
-      
+
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isMobile && sidebarOpen && (
@@ -56,15 +56,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+              transition={{ duration: 0.25 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 lg:hidden"
               onClick={() => dispatch(closeSidebar())}
             />
             <motion.div
               initial={{ x: -300 }}
               animate={{ x: 0 }}
               exit={{ x: -300 }}
-              transition={{ type: 'tween', duration: 0.2 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="fixed left-0 top-0 bottom-0 z-30 w-64 sidebar-container"
             >
               <Sidebar isMobile={true} />
@@ -74,19 +74,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </AnimatePresence>
 
       {/* Main Content */}
-      <div 
-        className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+      <div
+        className={`flex-1 flex flex-col overflow-hidden smooth-transition ${
           !isMobile && (sidebarOpen ? 'lg:ml-64' : 'lg:ml-16')
         }`}
         onClick={handleClickOutside}
       >
         <Header />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto relative">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="p-4 md:p-6"
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="p-4 md:p-6 lg:p-8"
           >
             {children}
           </motion.div>

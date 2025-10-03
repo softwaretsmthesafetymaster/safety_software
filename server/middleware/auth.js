@@ -36,17 +36,52 @@ export const authorize = (roles = []) => {
 
 export const checkCompanyAccess = (req, res, next) => {
   const { companyId } = req.params;
-  
+
   if (req.user.role === 'platform_owner') {
     return next();
   }
-  // console.log('User company ID:', req.user.companyId?._id.toString());
-  // console.log('Requested company ID:', companyId);
+
   if (req.user.companyId?._id?.toString() !== companyId) {
-    return res.status(403).json({ 
-      message: 'Access denied. Cannot access other company data.' 
+    return res.status(403).json({
+      message: 'Access denied. Cannot access other company data.'
     });
   }
-  
+
+  next();
+};
+
+export const enforceCompanyIsolation = (req, res, next) => {
+  if (req.user.role === 'platform_owner') {
+    return next();
+  }
+
+  const userCompanyId = req.user.companyId?._id?.toString();
+
+  if (req.body && !req.body.companyId) {
+    req.body.companyId = userCompanyId;
+  }
+
+  if (req.query && !req.query.companyId) {
+    req.query.companyId = userCompanyId;
+  }
+
+  req.filterByCompany = { companyId: userCompanyId };
+
+  next();
+};
+
+export const enforceUserIsolation = (req, res, next) => {
+  if (['platform_owner', 'company_owner'].includes(req.user.role)) {
+    return next();
+  }
+
+  req.filterByUser = {
+    $or: [
+      { createdBy: req.user._id },
+      { assignedTo: req.user._id },
+      { 'team.members': req.user._id }
+    ]
+  };
+
   next();
 };

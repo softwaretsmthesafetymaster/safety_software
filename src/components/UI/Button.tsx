@@ -34,20 +34,20 @@ const Button: React.FC<ButtonProps> = ({
   to,
 }) => {
   const baseClasses =
-    "inline-flex items-center justify-center font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200";
+    "inline-flex items-center justify-center font-medium rounded-lg focus-ring smooth-transition shadow-smooth hover:shadow-smooth-lg transform hover:-translate-y-0.5 active:translate-y-0";
 
   const variantClasses = {
-    primary: "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500",
+    primary: "gradient-primary text-white hover:from-primary-600 hover:to-primary-700",
     secondary:
-      "bg-gray-200 hover:bg-gray-300 text-gray-900 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white focus:ring-gray-500",
-    danger: "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500",
-    success: "bg-green-600 hover:bg-green-700 text-white focus:ring-green-500",
-    warning: "bg-yellow-600 hover:bg-yellow-700 text-white focus:ring-yellow-500",
+      "bg-gray-100 hover:bg-gray-200 text-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white",
+    danger: "gradient-danger text-white hover:from-danger-600 hover:to-danger-700",
+    success: "gradient-success text-white hover:from-success-600 hover:to-success-700",
+    warning: "gradient-warning text-white hover:from-warning-600 hover:to-warning-700",
   };
 
   const sizeClasses = {
     sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2 text-sm",
+    md: "px-4 py-2.5 text-sm",
     lg: "px-6 py-3 text-base",
   };
 
@@ -57,10 +57,12 @@ const Button: React.FC<ButtonProps> = ({
 
   return (
     <MotionComponent
+      whileHover={!isDisabled ? { scale: 1.02 } : undefined}
       whileTap={!isDisabled ? { scale: 0.98 } : undefined}
+      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       type={Component === "button" ? type : undefined}
       onClick={onClick}
-      to={to} // ✅ will be applied only if Link
+      to={to}
       disabled={isDisabled && Component === "button"}
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${
         isDisabled ? "opacity-50 cursor-not-allowed" : ""

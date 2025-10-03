@@ -166,12 +166,12 @@ const Sidebar: React.FC = () => {
       animate={{
         width: sidebarOpen ? 256 : 64,
       }}
-      transition={{ duration: 0.3 }}
-      className="fixed inset-y-0 left-0 z-50 bg-white dark:bg-gray-800 shadow-lg border-r border-gray-200 dark:border-gray-700 overflow-hidden"
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="fixed inset-y-0 left-0 z-50 glass-strong shadow-smooth-lg border-r border-gray-200/50 dark:border-gray-700/50 overflow-hidden"
     >
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
           <motion.div
             initial={false}
             animate={{
@@ -208,7 +208,7 @@ const Sidebar: React.FC = () => {
           </motion.div>
           <button
             onClick={handleToggleSidebar}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 smooth-transition"
           >
             {sidebarOpen ? (
               <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
@@ -219,7 +219,7 @@ const Sidebar: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
           {navSections.map((section, sectionIndex) => (
             <div key={section.title || `section-${sectionIndex}`}>
               {section.title && sidebarOpen && (
@@ -235,9 +235,9 @@ const Sidebar: React.FC = () => {
                 return (
                   <div key={item.name}>
                     <div
-                      className={`flex items-center justify-between px-3 py-2 mt-1 text-sm font-medium rounded-lg transition-colors cursor-pointer 
-                      ${isActive ? 'text-white' : 'text-gray-600 dark:text-gray-300'}
-                      ${!isActive && 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                      className={`flex items-center justify-between px-3 py-2.5 mt-1 text-sm font-medium rounded-lg smooth-transition cursor-pointer
+                      ${isActive ? 'text-white shadow-smooth' : 'text-gray-600 dark:text-gray-300'}
+                      ${!isActive && 'hover:bg-gray-100/50 dark:hover:bg-gray-700/50 hover:translate-x-0.5'}`}
                       style={isActive ? { backgroundColor: primaryColor } : undefined}
                       onClick={() => handleToggleExpanded(item.name, hasSubItems)}
                     >
@@ -321,7 +321,7 @@ const Sidebar: React.FC = () => {
             padding: sidebarOpen ? '1rem' : '0rem 1rem',
           }}
           transition={{ duration: 0.2 }}
-          className="border-t border-gray-200 dark:border-gray-700 overflow-hidden"
+          className="border-t border-gray-200/50 dark:border-gray-700/50 overflow-hidden backdrop-blur-sm"
         >
           <div className="flex items-center space-x-3">
             <div

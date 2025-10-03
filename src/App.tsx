@@ -128,15 +128,17 @@ const AppContent: React.FC = () => {
     if (token && !user) {
       dispatch(fetchUserProfile());
     }
-  }, [dispatch, user?.id]);
+  }, [dispatch]);
 
   
 
   useEffect(() => {
     if (user?.companyId && !currentCompany) {
-      dispatch(fetchCompanyById(user.companyId));
-      dispatch(fetchPlants({ companyId: user.companyId }));
-      dispatch(fetchUsers({ companyId: user.companyId }));
+      Promise.all([
+        dispatch(fetchCompanyById(user.companyId)),
+        dispatch(fetchPlants({ companyId: user.companyId })),
+        dispatch(fetchUsers({ companyId: user.companyId }))
+      ]);
     }
   }, [dispatch, user?.companyId, currentCompany]);
 
