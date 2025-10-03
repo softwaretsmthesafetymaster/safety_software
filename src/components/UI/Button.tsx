@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { LucideIcon } from "lucide-react";
+import { Video as LucideIcon } from "lucide-react";
 import LoadingSpinner from "./LoadingSpinner";
 
 interface ButtonProps {
