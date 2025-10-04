@@ -19,6 +19,7 @@ import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import { addNotification } from '../../store/slices/uiSlice';
+import { getArea } from '../../store/slices/plantSlice';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -52,6 +53,7 @@ const AuditForm: React.FC = () => {
   const { users } = useAppSelector((state) => state.user);
   
   const [selectedPlant, setSelectedPlant] = useState<any>(null);
+  const { areas } = useAppSelector((state) => state.plant);
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -82,7 +84,11 @@ const AuditForm: React.FC = () => {
       setSelectedPlant(plant);
     }
   }, [watchPlantId, plants]);
-
+  useEffect(() => {
+        if (watchPlantId) {
+          dispatch(getArea({ companyId: user.companyId, plantId: watchPlantId }));
+        }
+      }, [dispatch, user.companyId, watchPlantId]);
   useEffect(() => {
     if (watchTemplateId) {
       const template = templates.find(t => t._id === watchTemplateId);
@@ -398,10 +404,10 @@ const AuditForm: React.FC = () => {
                 className="w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                 disabled={!selectedPlant}
               >
-                <option value="">Select Area (Optional)</option>
-                {selectedPlant?.areas?.map((area: any) => (
+                <option value="">Select Area</option>
+                {areas?.map((area: any) => (
                   <option key={area._id} value={area._id}>
-                    {area.name} ({area.code})
+                    {area.name}
                   </option>
                 ))}
               </select>

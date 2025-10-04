@@ -21,6 +21,7 @@ import Button from '../../components/UI/Button';
 import { addNotification } from '../../store/slices/uiSlice';
 import { bbsService } from '../../services/bbs/bbsService';
 import { aiService } from '../../services/bbs/aiService';
+import { getArea } from '../../store/slices/plantSlice';
 
 interface BBSFormData {
   observationDate: string;
@@ -58,6 +59,7 @@ const BBSObservationForm: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
   const { currentReport, isLoading } = useAppSelector((state) => state.bbs);
   const { plants } = useAppSelector((state) => state.plant);
+  const { areas } = useAppSelector((state) => state.plant);
   const { currentCompany } = useAppSelector((state) => state.company);
   
   const [selectedPlant, setSelectedPlant] = useState<any>(null);
@@ -90,6 +92,12 @@ const BBSObservationForm: React.FC = () => {
       setSelectedPlant(plant);
     }
   }, [watchPlantId, plants]);
+
+  useEffect(() => {
+    if (watchPlantId) {
+      dispatch(getArea({ companyId: user?.companyId, plantId: watchPlantId }));
+    }
+  }, [dispatch, user?.companyId, watchPlantId]);
 
   useEffect(() => {
     if (isEdit && id && user?.companyId) {
@@ -325,9 +333,9 @@ const BBSObservationForm: React.FC = () => {
                     disabled={!selectedPlant}
                   >
                     <option value="">Select Area</option>
-                    {selectedPlant?.areas?.map((area: any) => (
+                    {areas?.map((area: any) => (
                       <option key={area._id} value={area._id}>
-                        {area.name} ({area.code}) - {area.hazardLevel.toUpperCase()} Risk
+                        {area.name}
                       </option>
                     ))}
                   </select>

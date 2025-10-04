@@ -1,8 +1,47 @@
 import express from 'express';
 import Notification from '../models/Notification.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
-
+import NotificationService from '../services/notificationService.js';
+import HAZOP from '../models/HAZOP.js';
 const router = express.Router();
+
+// Send notifications to team members for HAZOP
+router.post('/send-team-notification', async (req, res) => {
+  try {
+    const { companyId, studyId, type,  } = req.body
+    
+      const hazop = await HAZOP.findById(studyId)
+      const recipients = [hazop.chairman, hazop.scribe, ...hazop.team.map(t => t.member)]
+  
+    if (!companyId || !studyId || !type || !recipients) {
+      return res.status(400).json({ message: 'Missing required fields' })
+    }
+
+    const NotificationServiceInstance = NotificationService
+
+    // Prepare notifications
+    const notifications = recipients.map(userId => ({
+      title: 'HAZOP Study Assigned',
+      message: `You have been assigned to a HAZOP study. Study ID: ${studyId}`,
+      type: 'info',
+      userId,
+      companyId,
+      metadata: {
+        hazopId: studyId,
+        type
+      },
+      sendEmail: true
+    }))
+
+    await NotificationServiceInstance.createBulkNotifications(notifications)
+
+    res.status(200).json({ message: 'Notifications sent successfully' })
+  } catch (error) {
+    console.error('Error sending HAZOP notifications:', error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
 
 // Get all notifications for a company
 router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {

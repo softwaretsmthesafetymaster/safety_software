@@ -57,7 +57,7 @@ export const createHAZOPStudy = createAsyncThunk(
     await axios.post(`${API_URL}/notifications/send-team-notification`, {
       companyId,
       studyId: response.data.study._id,
-      type: 'hazop_team_assigned',
+      type: 'success',
       recipients: [
         studyData.chairman,
         studyData.scribe,
@@ -88,7 +88,7 @@ export const startHAZOPStudy = createAsyncThunk(
     await axios.post(`${API_URL}/notifications/send-team-notification`, {
       companyId,
       studyId: id,
-      type: 'hazop_study_started'
+      type: 'success'
     });
 
     return response.data.study;
@@ -105,7 +105,8 @@ export const completeHAZOPStudy = createAsyncThunk(
     await axios.post(`${API_URL}/notifications/send-team-notification`, {
       companyId,
       studyId: id,
-      type: 'hazop_ready_for_closure'
+      type: 'success',
+      
     });
 
     return response.data.study;
@@ -152,7 +153,7 @@ export const createWorksheet = createAsyncThunk(
       await axios.post(`${API_URL}/notifications/send-team-notification`, {
         companyId,
         studyId,
-        type: 'hazop_high_risk_identified',
+        type: 'warning',
         nodeNumber
       });
     }
@@ -195,7 +196,7 @@ export const markWorksheetComplete = createAsyncThunk(
       await axios.post(`${API_URL}/notifications/send-team-notification`, {
         companyId,
         studyId,
-        type: 'hazop_node_complete',
+        type: 'success',
         nodeNumber
       });
     }

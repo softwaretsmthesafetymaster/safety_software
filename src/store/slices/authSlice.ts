@@ -37,7 +37,7 @@ const initialState: AuthState = {
   token: localStorage.getItem('token'),
   isLoading: false,
   error: null,
-  isAuthenticated: !!localStorage.getItem('token'),
+  isAuthenticated: false,
 };
 
 // set default axios header if token exists
@@ -85,7 +85,11 @@ export const fetchUserProfile = createAsyncThunk(
   'auth/profile',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_URL}/auth/profile`);
+      const response = await axios.get(`${API_URL}/auth/profile`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
       return response.data.user;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch profile');
@@ -147,6 +151,7 @@ const authSlice = createSlice({
       // profile
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
         state.user = action.payload;
+        state.isAuthenticated = true;
       });
   },
 });

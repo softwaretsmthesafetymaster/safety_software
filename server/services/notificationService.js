@@ -2,18 +2,21 @@ import Notification from '../models/Notification.js'
 import emailService from './emailService.js'
 
 class NotificationService {
+  /* ------------------ Core Notification Helpers ------------------ */
+
   async createNotification(data) {
     try {
       const notification = new Notification(data)
       await notification.save()
 
-      if ( data.userId) {
+      if (data.sendEmail && data.userId) {
         const User = (await import('../models/User.js')).default
         const user = await User.findById(data.userId)
         if (user && user.email) {
           await this.sendEmailNotification(notification, user)
         }
       }
+
       return notification
     } catch (error) {
       console.error('Error creating notification:', error)
@@ -27,7 +30,7 @@ class NotificationService {
       const User = (await import('../models/User.js')).default
 
       for (const n of created) {
-        if ( n.userId) {
+        if (n.sendEmail && n.userId) {
           const user = await User.findById(n.userId)
           if (user?.email) {
             await this.sendEmailNotification(n, user)
@@ -52,7 +55,9 @@ class NotificationService {
           <div style="padding: 20px; background: #f8f9fa;">
             <h2 style="color: #333;">${notification.title}</h2>
             <p>${notification.message}</p>
-            <div style="margin: 20px 0; padding: 15px; background: ${this.getNotificationColor(notification.type)}; border-radius: 5px;">
+            <div style="margin: 20px 0; padding: 15px; background: ${this.getNotificationColor(
+              notification.type
+            )}; border-radius: 5px;">
               <p style="margin: 0; color: #333;"><strong>Type:</strong> ${notification.type.toUpperCase()}</p>
             </div>
             <div style="text-align: center; margin: 20px 0;">
@@ -86,29 +91,48 @@ class NotificationService {
 
   /* ------------------ Permit Notifications ------------------ */
 
-  async notifyPermitSubmitted(permit, firstApproverId) {
+  async notifyPermitSubmitted(permit, firstApproverId = null) {
+    const User = (await import('../models/User.js')).default
+    let approvers = []
 
-    if (!firstApproverId) return
-    const notification = {
+    if (firstApproverId) {
+      const u = await User.findById(firstApproverId)
+      if (u) approvers = [u]
+    } else {
+      approvers = await User.find({
+        companyId: permit.companyId,
+        role: { $in: ['safety_incharge', 'plant_head'] },
+        isActive: true
+      })
+    }
+
+    const notifications = approvers.map(user => ({
       title: 'New Permit Submitted for Approval',
       message: `Permit ${permit.permitNumber} has been submitted and requires your approval.`,
       type: 'info',
-      userId: firstApproverId,
+      userId: user._id,
       companyId: permit.companyId,
       metadata: {
         permitId: permit._id,
         permitNumber: permit.permitNumber,
         type: 'permit_submitted'
-      }
+      },
+      sendEmail: true
+    }))
+
+    await this.createBulkNotifications(notifications)
+
+    const approverEmails = approvers.map(a => a.email).filter(Boolean)
+    if (approverEmails.length > 0) {
+      await emailService.sendPermitNotification(permit, 'Submitted for Approval', approverEmails)
     }
-    await this.createNotification(notification)
   }
 
-  async notifyPermitPendingApproval(permit, approverId) {
+  async notifyPermitPendingApproval(permit, approverId, role = '') {
     if (!approverId) return
     const notification = {
       title: 'Permit Pending Your Approval',
-      message: `Permit ${permit.permitNumber} is pending your approval.`,
+      message: `Permit ${permit.permitNumber} is pending your approval ${role ? 'as ' + role : ''}.`,
       type: 'info',
       userId: approverId,
       companyId: permit.companyId,
@@ -197,11 +221,10 @@ class NotificationService {
     const requestedBy = await User.findById(permit.requestedBy)
     if (!requestedBy) return
 
+    const expiryDate = permit.expiresAt || permit.schedule?.endDate
     const notification = {
       title: 'Permit Expiring Soon',
-      message: `Permit ${permit.permitNumber} will expire on ${new Date(
-        permit.expiresAt || permit.schedule?.endDate
-      ).toLocaleString()}. Please take necessary action.`,
+      message: `Permit ${permit.permitNumber} will expire on ${new Date(expiryDate).toLocaleString()}. Please take necessary action.`,
       type: 'warning',
       userId: requestedBy._id,
       companyId: permit.companyId,
@@ -215,7 +238,7 @@ class NotificationService {
 
     if (requestedBy.email) {
       await emailService.sendReminderEmail(
-        { number: permit.permitNumber, dueDate: permit.expiresAt || permit.schedule?.endDate, status: permit.status },
+        { number: permit.permitNumber, dueDate: expiryDate, status: permit.status },
         'Permit Expiring',
         [requestedBy.email]
       )
@@ -252,6 +275,125 @@ class NotificationService {
       }
     }
     await this.createNotification(notification)
+  }
+
+  /* ------------------ Incident Notifications ------------------ */
+
+  async notifyIncidentReported(incident) {
+    const User = (await import('../models/User.js')).default
+    const safetyTeam = await User.find({
+      companyId: incident.companyId,
+      role: { $in: ['safety_incharge', 'plant_head'] },
+      isActive: true
+    })
+
+    const notifications = safetyTeam.map(member => ({
+      title: 'New Incident Reported',
+      message: `A ${incident.severity} severity incident has been reported: ${incident.incidentNumber}`,
+      type: incident.severity === 'critical' ? 'error' : 'warning',
+      userId: member._id,
+      companyId: incident.companyId,
+      metadata: {
+        incidentId: incident._id,
+        incidentNumber: incident.incidentNumber,
+        type: 'incident_reported'
+      }
+    }))
+    await this.createBulkNotifications(notifications)
+
+    const teamEmails = safetyTeam.map(m => m.email).filter(Boolean)
+    if (teamEmails.length > 0) {
+      await emailService.sendIncidentNotification(incident, 'Reported', teamEmails)
+    }
+  }
+
+  async notifyIncidentAssigned(incident, assignedTo) {
+    const notification = {
+      title: 'Incident Investigation Assigned',
+      message: `You have been assigned to investigate incident ${incident.incidentNumber}.`,
+      type: 'info',
+      userId: assignedTo,
+      companyId: incident.companyId,
+      metadata: {
+        incidentId: incident._id,
+        incidentNumber: incident.incidentNumber,
+        type: 'incident_assigned'
+      }
+    }
+    await this.createNotification(notification)
+  }
+
+  /* ------------------ Audit Notifications ------------------ */
+
+  async notifyAuditActionAssigned(audit, finding) {
+    const notification = {
+      title: 'Audit Corrective Action Assigned',
+      message: `You have been assigned a corrective action from audit ${audit.auditNumber}.`,
+      type: 'info',
+      userId: finding.correctiveAction.assignedTo,
+      companyId: audit.companyId,
+      metadata: {
+        auditId: audit._id,
+        auditNumber: audit.auditNumber,
+        findingId: finding._id,
+        type: 'audit_action_assigned'
+      }
+    }
+    await this.createNotification(notification)
+  }
+
+  /* ------------------ HAZOP Notifications ------------------ */
+
+  async notifyHAZOPSessionScheduled(hazop, attendees) {
+    const notifications = attendees.map(attendee => ({
+      title: 'HAZOP Session Scheduled',
+      message: `A HAZOP session for study ${hazop.studyNumber} has been scheduled.`,
+      type: 'info',
+      userId: attendee,
+      companyId: hazop.companyId,
+      metadata: {
+        hazopId: hazop._id,
+        studyNumber: hazop.studyNumber,
+        type: 'hazop_session'
+      }
+    }))
+    await this.createBulkNotifications(notifications)
+  }
+
+  /* ------------------ System Notifications ------------------ */
+
+  async notifySystemMaintenance(companyId, message) {
+    const User = (await import('../models/User.js')).default
+    const users = await User.find({ companyId, isActive: true })
+
+    const notifications = users.map(user => ({
+      title: 'System Maintenance Notice',
+      message,
+      type: 'info',
+      userId: user._id,
+      companyId,
+      metadata: { type: 'system_maintenance' }
+    }))
+    await this.createBulkNotifications(notifications)
+  }
+
+  async notifyConfigurationChange(companyId, module, changes) {
+    const User = (await import('../models/User.js')).default
+    const admins = await User.find({
+      companyId,
+      role: { $in: ['company_owner', 'plant_head'] },
+      isActive: true
+    })
+
+    const notifications = admins.map(admin => ({
+      title: 'Configuration Updated',
+      message: `${module} module configuration has been updated. Changes: ${changes}`,
+      type: 'info',
+      userId: admin._id,
+      companyId,
+      metadata: { module, changes, type: 'config_change' }
+    }))
+    await this.createBulkNotifications(notifications)
   }
 }
 

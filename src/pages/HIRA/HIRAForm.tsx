@@ -15,6 +15,7 @@ import { createHIRAAssessment, updateHIRAAssessment, fetchHIRAById } from '../..
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import { addNotification } from '../../store/slices/uiSlice';
+import { getArea } from '../../store/slices/plantSlice';
 
 interface HIRAFormData {
   title: string;
@@ -36,6 +37,7 @@ const HIRAForm: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
   const { currentAssessment, isLoading } = useAppSelector((state) => state.hira);
   const { plants } = useAppSelector((state) => state.plant);
+  const { areas } = useAppSelector((state) => state.plant);
   const { users } = useAppSelector((state) => state.user);
   
   const [selectedPlant, setSelectedPlant] = useState<any>(null);
@@ -56,6 +58,12 @@ const HIRAForm: React.FC = () => {
       setValue('areaId', ''); // Reset area when plant changes
     }
   }, [watchPlantId, plants, setValue]);
+
+  useEffect(() => {
+    if (watchPlantId) {
+      dispatch(getArea({ companyId: user?.companyId, plantId: watchPlantId }));
+    }
+  }, [dispatch, user?.companyId, watchPlantId]);
 
   useEffect(() => {
     if (isEdit && id && user?.companyId) {
@@ -215,9 +223,9 @@ const HIRAForm: React.FC = () => {
                 disabled={!selectedPlant}
               >
                 <option value="">Select Area</option>
-                {selectedPlant?.areas?.map((area: any) => (
+                {areas?.map((area: any) => (
                   <option key={area._id} value={area._id}>
-                    {area.name} ({area.code})
+                    {area.name} 
                   </option>
                 ))}
               </select>

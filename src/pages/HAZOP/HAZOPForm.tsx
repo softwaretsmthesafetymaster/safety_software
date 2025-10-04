@@ -17,6 +17,7 @@ import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import { addNotification } from '../../store/slices/uiSlice';
 import axios from 'axios';
+import { getArea } from '../../store/slices/plantSlice';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -70,6 +71,7 @@ const HAZOPForm: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
   const { currentStudy, isLoading } = useAppSelector((state) => state.hazop);
   const { plants } = useAppSelector((state) => state.plant);
+  const { areas } = useAppSelector((state) => state.plant);
   const { users } = useAppSelector((state) => state.user);
   const { currentCompany } = useAppSelector((state) => state.company);
   const [selectedPlant, setSelectedPlant] = useState<any>(null);
@@ -119,6 +121,12 @@ const HAZOPForm: React.FC = () => {
       setSelectedPlant(plant);
     }
   }, [watchPlantId, plants]);
+
+  useEffect(() => {
+      if (watchPlantId) {
+        dispatch(getArea({ companyId: user?.companyId, plantId: watchPlantId }));
+      }
+    }, [dispatch, user?.companyId, watchPlantId]);
 
   useEffect(() => {
     if (isEdit && id && user?.companyId) {
@@ -376,9 +384,9 @@ const HAZOPForm: React.FC = () => {
                 disabled={!selectedPlant}
               >
                 <option value="">Select Area</option>
-                {selectedPlant?.areas?.map((area: any) => (
+                {areas?.map((area: any) => (
                   <option key={area._id} value={area._id}>
-                    {area.name} ({area.code}) - {area.hazardLevel.toUpperCase()} Risk
+                    {area.name}
                   </option>
                 ))}
               </select>
