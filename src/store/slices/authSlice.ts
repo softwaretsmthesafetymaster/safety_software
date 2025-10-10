@@ -83,7 +83,7 @@ export const registerUser = createAsyncThunk(
 
 export const fetchUserProfile = createAsyncThunk(
   'auth/profile',
-  async (_, { rejectWithValue, dispatch }) => {
+  async (_, { rejectWithValue }) => {
     try {
       const response = await axios.get(`${API_URL}/auth/profile`, {
         headers: {
@@ -92,7 +92,6 @@ export const fetchUserProfile = createAsyncThunk(
       });
       return response.data.user;
     } catch (error: any) {
-      dispatch(logout());
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch profile');
     }
   }
@@ -153,6 +152,9 @@ const authSlice = createSlice({
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
         state.user = action.payload;
         state.isAuthenticated = true;
+      })
+      .addCase(fetchUserProfile.rejected, (state) => {
+        state.isAuthenticated = false;
       });
   },
 });
