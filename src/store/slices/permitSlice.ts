@@ -198,11 +198,8 @@ export const fetchPermits = createAsyncThunk(
   'permit/fetchAll',
   async ({ companyId, ...params }: { companyId: string; [key: string]: any }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
       const queryParams = new URLSearchParams(params).toString();
-      const response = await axios.get(`/permits/${companyId}?${queryParams}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/permits/${companyId}?${queryParams}`);
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch permits');
@@ -214,10 +211,7 @@ export const fetchPermitById = createAsyncThunk(
   'permit/fetchById',
   async ({ companyId, id }: { companyId: string; id: string }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/permits/${companyId}/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/permits/${companyId}/${id}`);
       return response.data.permit;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch permit');
@@ -229,10 +223,7 @@ export const fetchPermitChecklist = createAsyncThunk(
   'permit/fetchChecklist',
   async (permitType: string, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/permit/checklist/${permitType}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/permit/checklist/${permitType}`);
       return { permitType, checklist: response.data.checklist };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch checklist');
@@ -244,10 +235,7 @@ export const createPermit = createAsyncThunk(
   'permit/create',
   async ({ companyId, permitData }: { companyId: string; permitData: any }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`/permits/${companyId}`, permitData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.post(`/permits/${companyId}`, permitData);
       return response.data.permit;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create permit');
@@ -259,10 +247,7 @@ export const updatePermit = createAsyncThunk(
   'permit/update',
   async ({ companyId, id, data }: { companyId: string; id: string; data: any }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.put(`/permits/${companyId}/${id}`, data, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.put(`/permits/${companyId}/${id}`, data);
       return response.data.permit;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update permit');
@@ -274,10 +259,7 @@ export const submitPermit = createAsyncThunk(
   'permit/submit',
   async ({ companyId, id }: { companyId: string; id: string }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`/permits/${companyId}/${id}/submit`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.post(`/permits/${companyId}/${id}/submit`, {});
       return response.data.permit;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to submit permit');
@@ -295,13 +277,10 @@ export const approvePermit = createAsyncThunk(
     conditions?: string[];
   }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.post(`/permits/${companyId}/${id}/approve`, { 
         decision, 
         comments,
         conditions 
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       return response.data.permit;
     } catch (error: any) {
@@ -314,10 +293,7 @@ export const activatePermit = createAsyncThunk(
   'permit/activate',
   async ({ companyId, id }: { companyId: string; id: string }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`/permits/${companyId}/${id}/activate`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.post(`/permits/${companyId}/${id}/activate`, {});
       return response.data.permit;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to activate permit');
@@ -329,12 +305,9 @@ export const closePermit = createAsyncThunk(
   'permit/close',
   async ({ companyId, id, approvalDecision }: { companyId: string; id: string; approvalDecision: any }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.post(`/permits/${companyId}/${id}/close`, { 
         approvalDecision 
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      },);
       return response.data.permit;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to close permit');
@@ -346,11 +319,8 @@ export const stopPermit = createAsyncThunk(
   'permit/stop',
   async ({ companyId, id, stopData }: { companyId: string; id: string; stopData: any }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.post(`/permits/${companyId}/${id}/stop`, { 
         stopData 
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       return response.data.permit;
     } catch (error: any) {
@@ -369,13 +339,10 @@ export const extendPermit = createAsyncThunk(
     comments?: string;
   }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await axios.post(`/permits/${companyId}/${id}/extension`, { 
         extensionHours,
         extensionReason,
         comments 
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       return response.data.permit;
     } catch (error: any) {
@@ -388,11 +355,7 @@ export const fetchPermitStats = createAsyncThunk(
   'permit/fetchStats',
   async (companyId: string, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/permits/${companyId}/stats/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log("res",response.data.stats)
+      const response = await axios.get(`/permits/${companyId}/stats/dashboard`);
       return response.data.stats;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch statistics');
