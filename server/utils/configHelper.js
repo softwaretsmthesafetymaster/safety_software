@@ -2,20 +2,30 @@ import moduleConfigs from '../config/moduleConfigs.js';
 
 class ConfigHelper {
   static initializeCompanyConfig(data) {
-    const defaultConfig = {};
+    const moduleDefaults = {};
+    const roleSet = new Set();
 
+    // Loop through defined modules to build config
     for (const moduleName in moduleConfigs) {
-      defaultConfig[moduleName] = {
-        ...moduleConfigs[moduleName].default
-      };
+      const moduleConfig = moduleConfigs[moduleName].default || {};
+
+      moduleDefaults[moduleName] = moduleConfig;
+
+      // Extract roles from module configs
+      if (Array.isArray(moduleConfig.roles)) {
+        moduleConfig.roles.forEach(role => roleSet.add(role));
+      }
     }
 
-    // Merge with provided request data (like name, logo, industry)
     return {
       ...data,
       config: {
-        ...defaultConfig,
-        ...data.config // in case user sends custom config
+        modules: moduleDefaults,
+        roles: Array.from(roleSet),
+
+        // Optional overrides remain intact if user sends them
+        ui: data.config?.ui || {},
+        security: data.config?.security || {}
       }
     };
   }

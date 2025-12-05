@@ -275,7 +275,6 @@ router.post('/:companyId/:id/nodes/:nodeId/worksheet', authenticate, checkCompan
     }
     node.worksheets=worksheetData.worksheets
     await study.save();
-console.log("saved")
     res.json({
       message: 'Worksheet added successfully',
       study

@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Get API URL from environment variables
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
+axios.defaults.withCredentials = true;
 // Interfaces for data types
 interface User {
   _id: string;

@@ -193,7 +193,6 @@ const HAZOPWorksheet: React.FC = () => {
   const onSubmit = async (data: WorksheetFormData) => {
     if (!user?.companyId || !id) return;
     try {
-      console.log(data.worksheets);
       await dispatch(createWorksheet({
         companyId: user.companyId,
         studyId: id,

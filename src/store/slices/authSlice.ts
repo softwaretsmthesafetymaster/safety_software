@@ -3,9 +3,11 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Always send cookies
+axios.defaults.withCredentials = true;
 
 interface User {
-  id: string;
+  id?: string;
   _id: string;
   name: string;
   email: string;
@@ -21,12 +23,11 @@ interface User {
     logo?: string;
   };
   permissions?: string[];
-  isPaid?: boolean; // ✅ add payment status
+  isPaid?: boolean;
 }
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   error: string | null;
   isAuthenticated: boolean;
@@ -34,65 +35,63 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem('token'),
   isLoading: false,
   error: null,
   isAuthenticated: false,
 };
 
-// set default axios header if token exists
-if (initialState.token) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${initialState.token}`;
-}
-
+/* ---------------------------------------------------------
+   LOGIN
+--------------------------------------------------------- */
 export const loginUser = createAsyncThunk(
   'auth/login',
   async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-      const { token, user } = response.data;
-
-      // Save token and set axios header
-      localStorage.setItem('token', token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-      return { token, user };
+      const response = await axios.post(
+        `${API_URL}/auth/login`,
+        { email, password },
+        { withCredentials: true }
+      );
+      return response.data.user;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Login failed');
     }
   }
 );
 
-
-
+/* ---------------------------------------------------------
+   REGISTER
+--------------------------------------------------------- */
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData: any, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/register`, userData);
-      const { token, user } = response.data;
-      // Save token and set axios header
-      localStorage.setItem('token', token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      return response.data;
+      const response = await axios.post(
+        `${API_URL}/auth/register`,
+        userData,
+        { withCredentials: true }
+      );
+
+      return response.data.user;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Registration failed');
     }
   }
 );
 
+/* ---------------------------------------------------------
+   GET PROFILE (Auto login via cookie)
+--------------------------------------------------------- */
 export const fetchUserProfile = createAsyncThunk(
   'auth/profile',
   async (_, { rejectWithValue }) => {
     try {
       const response = await axios.get(`${API_URL}/auth/profile`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
+        withCredentials: true,
       });
       return response.data.user;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch profile');
+      return rejectWithValue('Session expired or unauthorized');
     }
   }
 );
@@ -102,10 +101,8 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout: (state) => {
-      localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
+      axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
       state.user = null;
-      state.token = null;
       state.isAuthenticated = false;
       state.error = null;
     },
@@ -113,47 +110,47 @@ const authSlice = createSlice({
       state.error = null;
     },
   },
+
   extraReducers: (builder) => {
     builder
-      // login
+      // Login
       .addCase(loginUser.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.token = action.payload.token;
-        state.user = action.payload.user;
+        state.user = action.payload;
         state.isAuthenticated = true;
-        state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
         state.isAuthenticated = false;
       })
-      // register
+
+      // Register
       .addCase(registerUser.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
-        state.token = null; // token only after payment
-        state.isAuthenticated = false;
-        state.error = null;
+        state.user = action.payload;
+        state.isAuthenticated = true; // Auto login after register
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // profile
+
+      // Profile
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
         state.user = action.payload;
         state.isAuthenticated = true;
       })
       .addCase(fetchUserProfile.rejected, (state) => {
+        state.user = null;
         state.isAuthenticated = false;
       });
   },

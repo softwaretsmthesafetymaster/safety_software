@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
 import {
   Save,
   XCircle,
@@ -16,14 +17,14 @@ import { fetchPermitById, stopPermit } from '../../store/slices/permitSlice';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
-import { addNotification } from '../../store/slices/uiSlice';
+import { format } from 'date-fns';
 
 interface StopData {
   stopReason: string;
   safetyIssue: string;
   immediateActions: string;
   stopComments: string;
-  notifyPersonnel: string[];
+  notifyPersonnel?: string[];
 }
 
 const PermitStop: React.FC = () => {
@@ -32,7 +33,7 @@ const PermitStop: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { currentPermit, isLoading } = useAppSelector((state) => state.permit);
-  const { currentCompany } = useAppSelector((state) => state.company);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<StopData>();
 
@@ -45,6 +46,7 @@ const PermitStop: React.FC = () => {
   const onSubmit = async (data: StopData) => {
     if (!user?.companyId || !id) return;
 
+    setIsSubmitting(true);
     try {
       await dispatch(stopPermit({
         companyId: user.companyId,
@@ -52,16 +54,12 @@ const PermitStop: React.FC = () => {
         stopData: data
       })).unwrap();
       
-      dispatch(addNotification({
-        type: 'warning',
-        message: 'Permit has been stopped due to safety concerns'
-      }));
+      toast.success('Permit has been stopped due to safety concerns');
       navigate('/ptw/permits');
     } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to stop permit'
-      }));
+      toast.error(error.message || 'Failed to stop permit');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -80,10 +78,9 @@ const PermitStop: React.FC = () => {
   }
 
   // Check if user can stop work
-  const canStopWork = 
-  currentPermit?.status === 'active' &&
-  Array.isArray(currentPermit?.stopWorkRoles) &&
-  currentPermit.stopWorkRoles.some(r => r.role === user.role);
+  const canStopWork = currentPermit?.status === 'active' &&
+    (currentPermit?.stopWorkRoles?.some(r => r.role === user?.role) ||
+     ['hod', 'safety_incharge', 'plant_head', 'admin'].includes(user?.role || ''));
 
   if (!canStopWork) {
     return (
@@ -93,7 +90,7 @@ const PermitStop: React.FC = () => {
           Access Denied
         </h3>
         <p className="mt-2 text-gray-500 dark:text-gray-400">
-          You don't have permission to stop work permits.
+          You don't have permission to stop work permits or this permit is not active.
         </p>
       </div>
     );
@@ -121,7 +118,7 @@ const PermitStop: React.FC = () => {
           <Button
             variant="danger"
             icon={XCircle}
-            loading={isLoading}
+            loading={isSubmitting}
             onClick={handleSubmit(onSubmit)}
           >
             Stop Work Immediately
@@ -147,9 +144,55 @@ const PermitStop: React.FC = () => {
                   Current Permit Status: {currentPermit.status.toUpperCase()}
                 </p>
                 <p className="text-xs text-red-700 dark:text-red-300">
-                  Work Period: {new Date(currentPermit.schedule?.startDate).toLocaleString()} - {new Date(currentPermit.schedule?.endDate).toLocaleString()}
+                  Work Period: {format(new Date(currentPermit.schedule?.startDate), 'MMM dd, yyyy HH:mm')} - {format(new Date(currentPermit.schedule?.endDate), 'MMM dd, yyyy HH:mm')}
                 </p>
+                {currentPermit.expiresAt && (
+                  <p className="text-xs text-red-700 dark:text-red-300">
+                    Permit Expires: {format(new Date(currentPermit.expiresAt), 'MMM dd, yyyy HH:mm')}
+                  </p>
+                )}
               </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Permit Summary */}
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Permit Summary
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Work Description
+              </label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                {currentPermit.workDescription}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Location
+              </label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                {currentPermit.areaId?.name} - {currentPermit.location?.area}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Workers Involved
+              </label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                {currentPermit.workers?.length || 0} workers
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Contractor
+              </label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                {currentPermit.contractor?.name}
+              </p>
             </div>
           </div>
         </Card>
@@ -190,7 +233,10 @@ const PermitStop: React.FC = () => {
                 Detailed Safety Issue Description *
               </label>
               <textarea
-                {...register('safetyIssue', { required: 'Safety issue description is required', minLength: { value: 20, message: 'Please provide detailed description (minimum 20 characters)' } })}
+                {...register('safetyIssue', { 
+                  required: 'Safety issue description is required', 
+                  minLength: { value: 20, message: 'Please provide detailed description (minimum 20 characters)' } 
+                })}
                 rows={5}
                 className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                 placeholder="Provide a detailed description of the safety issue or hazard that requires immediate work stoppage. Include specific conditions, equipment involved, and potential consequences..."
@@ -229,35 +275,10 @@ const PermitStop: React.FC = () => {
           </div>
         </Card>
 
-        {/* Personnel Notification */}
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-            <Users className="h-5 w-5 mr-2" />
-            Personnel Notification
-          </h2>
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  Automatic Notifications
-                </p>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                  The following personnel will be automatically notified:
-                </p>
-                <ul className="text-sm text-yellow-700 dark:text-yellow-300 mt-2 space-y-1">
-                  <li>• Permit requestor and all workers</li>
-                  <li>• Area supervisors and safety personnel</li>
-                  <li>• Plant management and emergency response team</li>
-                  <li>• All personnel in the affected area</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </Card>
+        
 
         {/* Photo Upload */}
-        <Card className="p-6">
+        {/* <Card className="p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
             <Camera className="h-5 w-5 mr-2" />
             Evidence Photos
@@ -274,6 +295,27 @@ const PermitStop: React.FC = () => {
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 PNG, JPG up to 10MB each. Document the safety issue, area conditions, and any damage or hazards.
               </p>
+            </div>
+          </div>
+        </Card> */}
+
+        {/* Confirmation */}
+        <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+          <div className="flex items-center space-x-3">
+            <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+            <div>
+              <h3 className="text-lg font-semibold text-red-900 dark:text-red-200">
+                Confirmation Required
+              </h3>
+              <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                By submitting this form, you confirm that:
+              </p>
+              <ul className="text-sm text-red-700 dark:text-red-300 mt-2 space-y-1">
+                <li>• There is an immediate safety concern requiring work stoppage</li>
+                <li>• All personnel have been evacuated from the danger area</li>
+                <li>• Immediate actions have been taken to secure the area</li>
+                <li>• This decision is made in the interest of personnel safety</li>
+              </ul>
             </div>
           </div>
         </Card>

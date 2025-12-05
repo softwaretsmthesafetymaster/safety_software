@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useForm, useFieldArray } from 'react-hook-form';
+import axios from 'axios';
 import {
   Save,
   Plus,
@@ -22,7 +23,7 @@ import { addNotification } from '../../store/slices/uiSlice';
 import { getArea } from '../../store/slices/plantSlice';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-
+axios.defaults.withCredentials=true
 interface AuditFormData {
   templateId: string;
   title: string;
@@ -141,12 +142,7 @@ const AuditForm: React.FC = () => {
 
   const initializeDefaultTemplates = async () => {
     try {
-      await fetch(`${API_URL}/templates/initialize-defaults/${user?.companyId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      await axios.post(`${API_URL}/templates/initialize-defaults/${user?.companyId}`);
     } catch (error) {
       console.error('Failed to initialize default templates:', error);
     }
@@ -155,13 +151,8 @@ const AuditForm: React.FC = () => {
   const fetchTemplates = async () => {
     try {
       setLoadingTemplates(true);
-      const response = await fetch(`${API_URL}/templates/${user?.companyId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      const data = await response.json();
-      setTemplates(data.templates || []);
+      const response = await axios.get(`${API_URL}/templates/${user?.companyId}`);
+      setTemplates(response?.data.templates || []);
     } catch (error) {
       console.error('Failed to fetch templates:', error);
     } finally {

@@ -1,13 +1,16 @@
 import { body, param, query, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 
-// Validation middleware
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log("Error in validation",errors)
     return res.status(400).json({
       message: 'Validation failed',
-      errors: errors.array()
+      errors: errors.array().map(err => ({
+        field: err.param,
+        message: err.msg,
+        value: err.value
+      }))
     });
   }
   next();
@@ -15,11 +18,255 @@ export const validate = (req, res, next) => {
 
 // Common validations
 export const validateObjectId = (field) => [
-  param(field).isMongoId().withMessage(`Invalid ${field} format`)
+  param(field).custom((value) => {
+    if (!mongoose.Types.ObjectId.isValid(value)) {
+      throw new Error(`Invalid ${field} format`);
+    }
+    return true;
+  })
 ];
 
 export const validateCompanyId = [
-  param('companyId').isMongoId().withMessage('Invalid company ID format')
+  param('companyId').custom((value) => {
+    if (!mongoose.Types.ObjectId.isValid(value)) {
+      throw new Error('Invalid company ID format');
+    }
+    return true;
+  })
+];
+
+// User Validations
+export const validateUserCreation = [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Name must be between 2 and 100 characters'),
+  
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters'),
+    
+  body('role')
+    .isIn(['platform_owner', 'company_owner', 'plant_head', 'safety_incharge', 'hod', 'contractor', 'worker', 'user', 'admin'])
+    .withMessage('Invalid role'),
+  
+  body('plantId')
+    .optional()
+    .custom((value) => {
+      if (value && !mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Invalid plant ID format');
+      }
+      return true;
+    }),
+  
+    
+  body('profile.employeeId')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('Employee ID must not exceed 50 characters')
+];
+
+export const validateUserUpdate = [
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Name must be between 2 and 100 characters'),
+  
+  body('email')
+    .optional()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  
+  body('role')
+    .optional()
+    .isIn(['platform_owner', 'company_owner', 'plant_head', 'safety_incharge', 'hod', 'contractor', 'worker', 'user', 'admin'])
+    .withMessage('Invalid role'),
+  
+  
+];
+
+// Plant Validations
+export const validatePlantCreation = [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Plant name must be between 2 and 100 characters'),
+  
+  body('code')
+    .trim()
+    .isLength({ min: 2, max: 20 })
+    .withMessage('Plant code must be between 2 and 20 characters')
+    .matches(/^[A-Z0-9-_]+$/i)
+    .withMessage('Plant code can only contain letters, numbers, hyphens, and underscores'),
+  
+  body('location.coordinates.lat')
+    .optional()
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('Latitude must be between -90 and 90'),
+  
+  body('location.coordinates.lng')
+    .optional()
+    .isFloat({ min: -180, max: 180 })
+    .withMessage('Longitude must be between -180 and 180'),
+  
+  body('contact.email')
+    .optional()
+    .isEmail()
+    .withMessage('Valid email is required'),
+  
+  body('capacity.maxEmployees')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Max employees must be a positive integer')
+];
+
+// Area Validations
+export const validateAreaCreation = [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Area name must be between 2 and 100 characters'),
+  
+  body('code')
+    .trim()
+    .isLength({ min: 2, max: 20 })
+    .withMessage('Area code must be between 2 and 20 characters')
+    .matches(/^[A-Z0-9-_]+$/i)
+    .withMessage('Area code can only contain letters, numbers, hyphens, and underscores'),
+  
+  body('description')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Description must not exceed 500 characters'),
+  
+  body('personnel.hod')
+    .optional()
+    .custom((value) => {
+      if (value && !mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Invalid HOD ID format');
+      }
+      return true;
+    }),
+  
+  body('personnel.safetyIncharge')
+    .optional()
+    .custom((value) => {
+      if (value && !mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Invalid Safety Incharge ID format');
+      }
+      return true;
+    }),
+  
+  body('riskProfile.level')
+    .optional()
+    .isIn(['low', 'medium', 'high', 'critical'])
+    .withMessage('Invalid risk level'),
+  
+  body('capacity.maxPersonnel')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Max personnel must be a positive integer')
+];
+
+// Company Validations
+export const validateCompanyCreation = [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Company name must be between 2 and 100 characters'),
+  
+  body('industry')
+    .isIn([
+      'Manufacturing', 'Oil & Gas', 'Chemical', 'Construction',
+      'Mining', 'Power Generation', 'Pharmaceuticals',
+      'Food & Beverage', 'Automotive', 'Aerospace', 'Other'
+    ])
+    .withMessage('Invalid industry'),
+  
+  body('contactInfo.email')
+    .optional()
+    .isEmail()
+    .withMessage('Valid email is required'),
+  
+  body('contactInfo.phone')
+    .optional()
+    .isMobilePhone()
+    .withMessage('Valid phone number is required'),
+  
+  body('contactInfo.website')
+    .optional()
+    .isURL()
+    .withMessage('Valid website URL is required')
+];
+
+export const validateCompanyUpdate = [
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Company name must be between 2 and 100 characters'),
+  
+  body('industry')
+    .optional()
+    .isIn([
+      'Manufacturing', 'Oil & Gas', 'Chemical', 'Construction',
+      'Mining', 'Power Generation', 'Pharmaceuticals',
+      'Food & Beverage', 'Automotive', 'Aerospace', 'Other'
+    ])
+    .withMessage('Invalid industry'),
+  
+  body('contactInfo.email')
+    .optional()
+    .isEmail()
+    .withMessage('Valid email is required'),
+  
+  body('contactInfo.phone')
+    .optional()
+    .isMobilePhone()
+    .withMessage('Valid phone number is required')
+];
+
+// Query parameter validations
+export const validatePagination = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer'),
+  
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  
+  query('sort')
+    .optional()
+    .matches(/^[a-zA-Z_.-]+:(asc|desc)$/)
+    .withMessage('Sort must be in format "field:asc" or "field:desc"')
+];
+
+export const validateDateRange = [
+  query('startDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Valid start date is required'),
+  
+  query('endDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Valid end date is required')
+    .custom((value, { req }) => {
+      if (req.query.startDate && value && new Date(value) <= new Date(req.query.startDate)) {
+        throw new Error('End date must be after start date');
+      }
+      return true;
+    })
 ];
 
 // PTW Validations
@@ -135,61 +382,6 @@ export const validateChecklistUpdate = [
     .withMessage('Invalid severity level')
 ];
 
-// Plant Validations
-export const validatePlantCreation = [
-  body('name').notEmpty().withMessage('Plant name is required'),
-  body('code').notEmpty().withMessage('Plant code is required'),
-];
-
-export const validateAreaCreation = [
-  body('name').notEmpty().withMessage('Area name is required'),
-  body('code').notEmpty().withMessage('Area code is required'),
- 
-];
-
-// User Validations
-export const validateUserCreation = [
-  body('name').notEmpty().withMessage('Name is required'),
-  body('email').isEmail().withMessage('Valid email is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('role').isIn(['platform_owner', 'company_owner', 'plant_head', 'safety_incharge', 'hod', 'contractor', 'worker','user','admin'])
-    .withMessage('Invalid role'),
-  // body('plantId').optional().isMongoId().withMessage('Valid plant ID is required')
-];
-
-export const validateUserUpdate = [
-  body('name').optional().notEmpty().withMessage('Name cannot be empty'),
-  body('email').optional().isEmail().withMessage('Valid email is required'),
-  body('role').optional().isIn(['platform_owner', 'company_owner', 'plant_head', 'safety_incharge', 'hod', 'contractor', 'worker','user','admin'])
-    .withMessage('Invalid role'),
-  // body('plantId').optional().isMongoId().withMessage('Valid plant ID is required')
-];
-
-// Company Validations
-export const validateCompanyCreation = [
-  body('name').notEmpty().withMessage('Company name is required'),
-  body('industry').notEmpty().withMessage('Industry is required'),
-  body('contactInfo.email').optional().isEmail().withMessage('Valid email is required'),
-  body('contactInfo.phone').optional().isMobilePhone().withMessage('Valid phone number is required')
-];
-
-export const validateCompanyUpdate = [
-  body('name').optional().notEmpty().withMessage('Company name cannot be empty'),
-  body('industry').optional().notEmpty().withMessage('Industry cannot be empty'),
-  body('contactInfo.email').optional().isEmail().withMessage('Valid email is required'),
-  body('contactInfo.phone').optional().isMobilePhone().withMessage('Valid phone number is required')
-];
-
-// Query parameter validations
-export const validatePagination = [
-  query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
-];
-
-export const validateDateRange = [
-  query('startDate').optional().isISO8601().withMessage('Valid start date is required'),
-  query('endDate').optional().isISO8601().withMessage('Valid end date is required')
-];
 
 // File upload validations
 export const validateFileUpload = [

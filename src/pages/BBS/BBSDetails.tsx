@@ -128,7 +128,7 @@ const BBSDetails: React.FC = () => {
         }
         break;
       case 'approved':
-        if (currentReport.correctiveActions?.some(action => action.assignedTo?._id === user?.id)) {
+        if (currentReport.correctiveActions?.some(action => action.assignedTo?._id === user?._id)) {
           return { text: 'Complete Action', link: `/bbs/observations/${id}/complete`, icon: CheckCircle };
         }
         break;

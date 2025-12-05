@@ -59,7 +59,7 @@ const BBSActionComplete: React.FC = () => {
       
       // Find the action assigned to current user
       const userAction = fetchedReport.correctiveActions?.find(
-        (action: any) => action.assignedTo?._id === user.id
+        (action: any) => action.assignedTo?._id === user._id
       );
       setMyAction(userAction);
       

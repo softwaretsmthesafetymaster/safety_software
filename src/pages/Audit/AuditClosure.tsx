@@ -41,12 +41,9 @@ const AuditClosure: React.FC = () => {
   }, [dispatch, id, user?.companyId]);
 
   const fetchObservations = async () => {
-    console.log("user",user)
-    console.log("id",id)
     if (!user?.companyId || !id) return;
     
     try {
-      console.log("ch")
       const response=await axios.get(`${API_URL}/observations/${user?.companyId}/audit/${id}`);
       const data=await response.data;
       setObservations(data.observations || []);
@@ -134,7 +131,6 @@ const AuditClosure: React.FC = () => {
   }
 
   const observationStats = getObservationStats();
-  console.log(observationStats);
   const riskStats = getRiskStats();
   const canClose = currentAudit.status === 'completed' && observationStats.approved === observationStats.total;
 

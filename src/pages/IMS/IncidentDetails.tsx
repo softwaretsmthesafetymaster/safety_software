@@ -444,7 +444,7 @@ const IncidentDetails: React.FC = () => {
                   </Button>
                 
                 )}
-              {currentIncident.status === 'pending_closure' && (
+              {(currentIncident.status === 'pending_closure' || currentIncident.status === 'actions_assigned') && (
                 <Button
                   variant="success"
                   className="w-full"

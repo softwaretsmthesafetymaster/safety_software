@@ -18,7 +18,7 @@ const bbsReportSchema = new mongoose.Schema({
   },
   areaId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Plant.areas'
+    ref: 'Area'
   },
   observer: {
     type: mongoose.Schema.Types.ObjectId,

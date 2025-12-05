@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDatabase from './config/database.js';
+import cookieParser from 'cookie-parser';
 
 // Route imports
 import authRoutes from './routes/auth.js';
@@ -26,6 +27,10 @@ import templateRoutes from './routes/templates.js';
 import observationRoutes from './routes/observations.js';
 import checklistRoutes from './routes/checklist.js';
 import platformRoutes from './routes/platform.js'
+import dashboardRoutes from './routes/dashboard.js'
+import permitChecklist from './routes/permitChecklist.js'
+
+import { requestLogger, errorLogger } from './middleware/logger.js';
 
 dotenv.config();
 
@@ -39,7 +44,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
+app.use(cookieParser());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
@@ -59,6 +64,8 @@ app.use('/api/observations', observationRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/checklist', checklistRoutes);
 app.use('/api/platform',platformRoutes)
+app.use('/api/dashboard',dashboardRoutes)
+app.use('/api/permit/checklist',permitChecklist)
 // Workflow routes
 app.use('/api/workflow', (req, res, next) => {
   // Generic workflow handler

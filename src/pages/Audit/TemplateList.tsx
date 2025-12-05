@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import axios from 'axios';
 import {
   Plus,
   Search,
@@ -20,7 +21,7 @@ import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Modal from '../../components/UI/Modal';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-
+axios.defaults.withCredentials = true;
 interface Template {
   _id: string;
   name: string;
@@ -59,12 +60,7 @@ const TemplateList: React.FC = () => {
 
   const initializeDefaultTemplates = async () => {
     try {
-      await fetch(`${API_URL}/templates/initialize-defaults/${user?.companyId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      await axios.post(`${API_URL}/templates/initialize-defaults/${user?.companyId}`);
     } catch (error) {
       console.error('Failed to initialize default templates:', error);
     }
@@ -73,13 +69,8 @@ const TemplateList: React.FC = () => {
   const fetchTemplates = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_URL}/templates/${user?.companyId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      const data = await response.json();
-      setTemplates(data.templates || []);
+      const response = await axios.get(`${API_URL}/templates/${user?.companyId}`);
+      setTemplates(response.data.templates || []);
     } catch (error) {
       console.error('Failed to fetch templates:', error);
     } finally {
@@ -103,15 +94,9 @@ const TemplateList: React.FC = () => {
       formData.append('standard', uploadData.standard);
       formData.append('description', uploadData.description);
 
-      const response = await fetch(`${API_URL}/templates/${user?.companyId}/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: formData
-      });
+      const response = await axios.post(`${API_URL}/templates/${user?.companyId}/upload`, formData);
 
-      if (response.ok) {
+      if (response.status === 200) {
         dispatch(addNotification({
           type: 'success',
           message: 'Template uploaded successfully'
@@ -138,7 +123,7 @@ const TemplateList: React.FC = () => {
       const response = await fetch(`${API_URL}/templates/${user?.companyId}/${templateId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          withCredentials: true,
         },
       });
 

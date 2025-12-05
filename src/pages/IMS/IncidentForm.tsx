@@ -144,7 +144,7 @@ const IncidentForm: React.FC = () => {
         await dispatch(updateIncident({
           companyId: user.companyId,
           id,
-          data: incidentData
+          updateData: incidentData
         })).unwrap();
         dispatch(addNotification({
           type: 'success',

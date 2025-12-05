@@ -1,15 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  MapPin,
-  Building,
-  Users,
-  Settings
-} from 'lucide-react';
+import { Plus, Search, CreditCard as Edit, Trash2, MapPin, Building, Users, Settings, Phone, Mail } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
 import { fetchPlants, createPlant, updatePlant, deletePlant } from '../../store/slices/plantSlice';
 import Card from '../../components/UI/Card';
@@ -17,36 +8,39 @@ import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { addNotification } from '../../store/slices/uiSlice';
+import toast from 'react-hot-toast';
+
 interface PlantFormData {
   name: string;
   code: string;
   location: {
     address: string;
     coordinates: {
-      lat: number;
-      lng: number;
+      lat?: number;
+      lng?: number;
     };
   };
-  areas: Array<{
-    name: string;
-    code: string;
-    description: string;
-    hazardLevel: string;
-  }>;
+  contact: {
+    phone?: string;
+    email?: string;
+  };
+  capacity: {
+    maxEmployees?: number;
+  };
 }
 
 const PlantManagement: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { user } = useAppSelector((state) => state.auth);
   const { plants, isLoading } = useAppSelector((state) => state.plant);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingPlant, setEditingPlant] = useState<any>(null);
-  const [showAreaForm, setShowAreaForm] = useState(false);
-  const [selectedPlant, setSelectedPlant] = useState<any>(null);
-
-  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PlantFormData>();
 
@@ -59,6 +53,7 @@ const PlantManagement: React.FC = () => {
   const onSubmit = async (data: PlantFormData) => {
     if (!user?.companyId) return;
 
+    setIsSubmitting(true);
     try {
       if (editingPlant) {
         await dispatch(updatePlant({
@@ -66,18 +61,22 @@ const PlantManagement: React.FC = () => {
           id: editingPlant._id,
           data
         })).unwrap();
+        toast.success('Plant updated successfully')
       } else {
         await dispatch(createPlant({
           companyId: user.companyId,
           plantData: data
         })).unwrap();
+        toast.success('Plant created successfully')
       }
       
       setShowForm(false);
       setEditingPlant(null);
       reset();
-    } catch (error) {
-      console.error('Error saving plant:', error);
+    } catch (error: any) {
+      toast.error(error|| 'Something went wrong')
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -88,12 +87,16 @@ const PlantManagement: React.FC = () => {
   };
 
   const handleDelete = async (plantId: string) => {
-    if (!user?.companyId || !confirm('Are you sure you want to delete this plant?')) return;
+    if (!user?.companyId || !window.confirm('Are you sure you want to delete this plant?')) return;
     
+    setDeletingId(plantId);
     try {
       await dispatch(deletePlant({ companyId: user.companyId, id: plantId })).unwrap();
-    } catch (error) {
-      console.error('Error deleting plant:', error);
+      toast.success('Plant deleted')
+    } catch (error: any) {
+      toast.error('Failed to delete Plant')
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -115,7 +118,7 @@ const PlantManagement: React.FC = () => {
             Plant Management
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage plants and their areas
+            Manage plants and their configurations
           </p>
         </div>
         <Button
@@ -123,7 +126,7 @@ const PlantManagement: React.FC = () => {
           icon={Plus}
           onClick={() => {
             setEditingPlant(null);
-            reset();
+            reset({});
             setShowForm(true);
           }}
         >
@@ -150,27 +153,28 @@ const PlantManagement: React.FC = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
           >
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
               {editingPlant ? 'Edit Plant' : 'Add New Plant'}
             </h2>
             
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Plant Name *
                   </label>
                   <input
                     {...register('name', { required: 'Plant name is required' })}
                     type="text"
-                    className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter plant name"
                   />
                   {errors.name && (
                     <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
@@ -178,13 +182,14 @@ const PlantManagement: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Plant Code *
                   </label>
                   <input
                     {...register('code', { required: 'Plant code is required' })}
                     type="text"
-                    className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter plant code"
                   />
                   {errors.code && (
                     <p className="mt-1 text-sm text-red-600">{errors.code.message}</p>
@@ -193,55 +198,103 @@ const PlantManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Address
                 </label>
                 <textarea
                   {...register('location.address')}
                   rows={3}
-                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Enter plant address"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Contact Phone
+                  </label>
+                  <input
+                    {...register('contact.phone')}
+                    type="tel"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter contact phone"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Contact Email
+                  </label>
+                  <input
+                    {...register('contact.email')}
+                    type="email"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter contact email"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Latitude
                   </label>
                   <input
                     {...register('location.coordinates.lat', { valueAsNumber: true })}
                     type="number"
                     step="any"
-                    className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter latitude"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Longitude
                   </label>
                   <input
                     {...register('location.coordinates.lng', { valueAsNumber: true })}
                     type="number"
                     step="any"
-                    className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter longitude"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Maximum Employees
+                </label>
+                <input
+                  {...register('capacity.maxEmployees', { valueAsNumber: true })}
+                  type="number"
+                  min="1"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Enter maximum employees"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-4 pt-6">
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => {
                     setShowForm(false);
                     setEditingPlant(null);
-                    reset();
+                    reset({});
                   }}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" variant="primary">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                >
                   {editingPlant ? 'Update' : 'Create'} Plant
                 </Button>
               </div>
@@ -259,7 +312,7 @@ const PlantManagement: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card hover className="p-6">
+            <Card hover className="p-6 h-full">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
@@ -280,31 +333,54 @@ const PlantManagement: React.FC = () => {
                     variant="secondary"
                     icon={Edit}
                     onClick={() => handleEdit(plant)}
+                    disabled={deletingId === plant._id}
                   />
                   <Button
                     size="sm"
                     variant="danger"
                     icon={Trash2}
                     onClick={() => handleDelete(plant._id)}
+                    loading={deletingId === plant._id}
+                    disabled={deletingId === plant._id}
                   />
                 </div>
               </div>
 
-              {plant.location?.address && (
-                <div className="flex items-center space-x-2 mb-3">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {plant.location.address}
-                  </p>
-                </div>
-              )}
+              <div className="space-y-3 mb-4">
+                {plant.location?.address && (
+                  <div className="flex items-start space-x-2">
+                    <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {plant.location.address}
+                    </p>
+                  </div>
+                )}
 
-              <div className="flex items-center justify-between">
+                {plant.contact?.phone && (
+                  <div className="flex items-center space-x-2">
+                    <Phone className="h-4 w-4 text-gray-400" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {plant.contact.phone}
+                    </p>
+                  </div>
+                )}
+
+                {plant.contact?.email && (
+                  <div className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4 text-gray-400" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {plant.contact.email}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-1">
                     <Users className="h-4 w-4 text-gray-400" />
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {plant.areas?.length || 0} Areas
+                      {plant.areaCount || 0} Areas
                     </span>
                   </div>
                   <div className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -319,12 +395,9 @@ const PlantManagement: React.FC = () => {
                   size="sm"
                   variant="secondary"
                   icon={Settings}
-                  onClick={() => {
-                    setSelectedPlant(plant);
-                    navigate(`/management/areas`);
-                  }}
+                  onClick={() => navigate('/management/areas')}
                 >
-                  Manage Areas
+                  Areas
                 </Button>
               </div>
             </Card>
@@ -352,7 +425,7 @@ const PlantManagement: React.FC = () => {
                 icon={Plus}
                 onClick={() => {
                   setEditingPlant(null);
-                  reset();
+                  reset({});
                   setShowForm(true);
                 }}
               >

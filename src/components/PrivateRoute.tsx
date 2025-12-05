@@ -25,34 +25,14 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
   const { currentCompany, isLoading: companyLoading } = useAppSelector(
     (state) => state.company
   );
-
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
-
-  // Fetch user on mount if not loaded
-  useEffect(() => {
-    if (!user) {
-      dispatch(fetchUserProfile()).finally(() => setInitialCheckDone(true));
-    } else {
-      setInitialCheckDone(true);
-    }
-  }, [user, dispatch]);
-
-  // Fetch company after user is loaded and not platform owner
-  useEffect(() => {
-    if (user && user.role !== "platform_owner" && !currentCompany) {
-      dispatch(fetchCompanyById(user.companyId));
-    }
-  }, [user, currentCompany, dispatch]);
-
-  if (authLoading || !initialCheckDone) {
+  console.log("user",user)
+  console.log("company",currentCompany)
+  if (authLoading) {
     return <LoadingSpinner className="min-h-screen" />;
   }
 
   if (!isAuthenticated) {
-    if (location.pathname === "/login" || location.pathname === "/register") {
-      return <>{children}</>;
-    }
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Platform owner → redirect/render immediately
@@ -66,7 +46,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
   }
 
   // Normal user checks
-  if (!user.isPaid || !currentCompany.isActive) {
+  if (user && currentCompany && currentCompany?.subscription?.status!=="active") {
     if (location.pathname === "/payment") return <>{children}</>;
     return <Navigate to="/payment" replace />;
   }

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
-import { loginUser, clearError } from '../../store/slices/authSlice';
+import { loginUser, clearError, fetchUserProfile } from '../../store/slices/authSlice';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import Navbar from '../../components/Navbar';
@@ -16,7 +16,7 @@ interface LoginForm {
 const Login: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { isLoading, error } = useAppSelector((state) => state.auth);
+  const { isLoading, error,user } = useAppSelector((state) => state.auth);
   const [showPassword, setShowPassword] = useState(false);
   
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
@@ -26,11 +26,16 @@ const Login: React.FC = () => {
     dispatch(loginUser(data));
   };
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      navigate('/dashboard');
-    } 
-  })
+  if (user) {
+    if (user?.role === "platform_owner"){
+      navigate('/platform')
+    }
+    else{
+    navigate("/dashboard");
+    }
+  }
+}, [user, navigate]);
+
 
   
   return (

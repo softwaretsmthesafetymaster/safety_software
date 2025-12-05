@@ -1,6 +1,7 @@
 import Agenda from 'agenda';
 import mongoose from 'mongoose';
 import notificationService from './notificationService.js';
+import permitNotification from './permitNotification.js';
 import emailService from './emailService.js';
 
 class ReminderService {
@@ -25,7 +26,7 @@ class ReminderService {
           .populate('companyId', 'name');
         
         if (permit && permit.status === 'active') {
-          await notificationService.notifyPermitExpiring(permit);
+          await permitNotification.notifyPermitExpiring(permit);
         }
       } catch (error) {
         console.error('Error in permit expiry reminder:', error);

@@ -57,7 +57,7 @@ const Sidebar: React.FC = () => {
 
   const isModuleEnabled = (moduleKey: string | null) => {
     if (!moduleKey) return true;
-    return currentCompany?.config?.modules?.[moduleKey]?.enabled || false;
+    return currentCompany?.config?.modules?.[moduleKey]?.enabled|| false;
   };
 
   const branding = currentCompany?.config?.branding;
@@ -74,7 +74,8 @@ const Sidebar: React.FC = () => {
       subItems: [
         { name: 'Dashboard', href: '/ptw' },
         { name: 'Permits', href: '/ptw/permits' },
-        { name: 'New Permit', href: '/ptw/permits/new' }
+        { name: 'New Permit', href: '/ptw/permits/new' },
+        { name: 'Checklist', href: '/ptw/permits/checklist'}
       ]
     },
     {
@@ -150,15 +151,28 @@ const Sidebar: React.FC = () => {
     { name: 'Companies', href: '/platform/companies', icon: Building },
   ];
 
-  const navSections = [
-    { title: '', items: navigation.filter(item => isModuleEnabled(item.module)) },
-    ...(user?.role === 'company_owner' || user?.role === 'plant_head'
-      ? [{ title: 'Management', items: managementNavigation }]
-      : []),
-    ...(user?.role === 'platform_owner'
-      ? [{ title: 'Platform', items: platformNavigation }]
-      : []),
+  let navSections = [];
+
+if (user?.role === 'platform_owner') {
+  // Platform owner sees only platform navigation
+  navSections = [
+    { title: 'Platform', items: platformNavigation }
   ];
+
+} else {
+  // Normal Company Users
+  navSections = [
+    { title: '', items: navigation.filter(item => isModuleEnabled(item.module)) },
+  ];
+
+  if (user?.role === 'company_owner' || user?.role === 'plant_head') {
+    navSections.push({
+      title: 'Management',
+      items: managementNavigation
+    });
+  }
+}
+
 
   return (
     <motion.div

@@ -73,10 +73,8 @@ router.post('/:companyId', authenticate, checkCompanyAccess, async (req, res) =>
     }
     
     templateData.code = code;
-    console.log(templateData);
     const template = new AuditTemplate(templateData);
     await template.save();
-    console.log("done");
 
     res.status(201).json({
       message: 'Template created successfully',

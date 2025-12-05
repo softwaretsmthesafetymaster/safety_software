@@ -108,7 +108,7 @@ const IncidentInvestigation: React.FC = () => {
       await dispatch(updateIncident({
         companyId: user.companyId,
         id,
-        data: {
+        updateData: {
           ...data,
           status: 'rca_submitted'
         }

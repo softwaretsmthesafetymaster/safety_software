@@ -10,9 +10,9 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 const Card: React.FC<CardProps> = ({ children, className = '', hover = false, ...props }) => {
   return (
     <motion.div
-      whileHover={hover ? { y: -4, scale: 1.01 } : undefined}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className={`card-modern ${hover ? 'hover-lift' : ''} ${className}`}
+      whileHover={hover ? {  scale: 1.01 } : undefined}
+      
+      className={`card-modern ${className}`}
       {...props}
     >
       {children}

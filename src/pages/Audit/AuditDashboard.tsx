@@ -1,158 +1,247 @@
-import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import {
-  BarChart3,
-  CheckSquare,
-  Clock,
-  Eye,
-  AlertTriangle,
-  TrendingUp,
+import React, { useState, useMemo } from 'react';
+import { 
+  BarChart3, 
+  TrendingUp, 
+  AlertTriangle, 
+  FileText, 
+  Target,
+  Calendar,
   Users,
-  FileText,
-  Plus
+  Activity,
+  CheckSquare,
+  Eye,
+  Filter,
+  Download,
+  RefreshCw,
+  Building2
 } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '../../hooks/redux';
-import { fetchAuditStats } from '../../store/slices/auditSlice';
 import Card from '../../components/UI/Card';
-import Button from '../../components/UI/Button';
+import { format, subMonths } from 'date-fns';
+
+// Components
+import ComplianceMatrix from './Charts/ComplianceMatrix';
+import ClauseComplianceChart from './Charts/ClauseComplianceChart';
+import MonthlyTrendChart from './Charts/MonthlyTrendChart';
+import CategoryRadarChart from './Charts/CategoryRadarChart';
+import ComplianceHeatmap from './Charts/ComplianceHeatmap';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
-import { format } from 'date-fns';
+import ErrorMessage from '../../components/UI/ErrorMessage';
 
-const AuditDashboard: React.FC = () => {
-  const dispatch = useAppDispatch();
+// Hooks and Services
+import { useAuditData } from '../../hooks/useAuditData';
+import { auditService, AuditFilters } from '../../services/audit/auditService';
+import { useAppSelector } from '../../hooks/redux';
+import { Link } from 'react-router-dom';
+
+
+function App() {
   const { user } = useAppSelector((state) => state.auth);
-  const { stats, isLoading } = useAppSelector((state) => state.audit);
+  const companyId = user?.companyId
+  
+  const [filters, setFilters] = useState<AuditFilters>({
+    dateFrom: format(subMonths(new Date(), 12), 'yyyy-MM-dd'),
+    dateTo: format(new Date(), 'yyyy-MM-dd'),
+  });
+  const [selectedTimeframe, setSelectedTimeframe] = useState('12months');
 
-  useEffect(() => {
-    if (user?.companyId) {
-      dispatch(fetchAuditStats(user.companyId));
+  const { data, isLoading, error, refetchAll } = useAuditData(companyId, filters);
+  console.log("data:",data)
+  const handleTimeframeChange = (timeframe: string) => {
+    setSelectedTimeframe(timeframe);
+    const months = timeframe === '3months' ? 3 : timeframe === '6months' ? 6 : 12;
+    setFilters({
+      ...filters,
+      dateFrom: format(subMonths(new Date(), months), 'yyyy-MM-dd'),
+      dateTo: format(new Date(), 'yyyy-MM-dd'),
+    });
+  };
+
+  const handleFilterChange = (key: keyof AuditFilters, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value || undefined
+    }));
+  };
+
+  const handleExportData = async () => {
+    try {
+      const blob = await auditService.exportDashboardData(companyId, filters, 'excel');
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `safety-audit-dashboard-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export failed:', error);
     }
-  }, [dispatch, user?.companyId]);
+  };
 
-  if (isLoading) {
-    return <LoadingSpinner className="min-h-screen" />;
+  const stats = useMemo(() => {
+    if (!data.dashboardStats) return null;
+    return data.dashboardStats;
+  }, [data.dashboardStats]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <ErrorMessage 
+          message="Failed to load dashboard data. Please check your connection and try again."
+          onRetry={refetchAll}
+          className="min-h-[400px]"
+        />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Audit Dashboard
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Monitor and manage safety audits across your organization
-          </p>
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <Building2 className="h-8 w-8 mr-3 text-blue-600" />
+              Safety Audit Dashboard
+            </h1>
+            <p className="text-gray-600 mt-1">Department & Clause Conformance Analytics</p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={refetchAll}
+              className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <select 
+              value={selectedTimeframe}
+              onChange={(e) => handleTimeframeChange(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="3months">Last 3 Months</option>
+              <option value="6months">Last 6 Months</option>
+              <option value="12months">Last 12 Months</option>
+            </select>
+            <button 
+              onClick={handleExportData}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Report
+            </button>
+          </div>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button
-            as={Link}
-            to="/audit/audits"
-            variant="secondary"
-            icon={Eye}
+
+        {/* Filters */}
+        <div className="mt-6 flex flex-wrap gap-4">
+          <select
+            value={filters.status || ''}
+            onChange={(e) => handleFilterChange('status', e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
           >
-            View All Audits
-          </Button>
-          <Button
-            as={Link}
-            to="/audit/audits/new"
-            variant="primary"
-            icon={Plus}
+            <option value="">All Status</option>
+            <option value="planned">Planned</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="closed">Closed</option>
+          </select>
+
+          <select
+            value={filters.standard || ''}
+            onChange={(e) => handleFilterChange('standard', e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
           >
-            New Audit
-          </Button>
+            <option value="">All Standards</option>
+            <option value="BIS14489">BIS 14489</option>
+            <option value="FireSafety">Fire Safety</option>
+            <option value="ElectricalSafety">Electrical Safety</option>
+            <option value="ISO45001">ISO 45001</option>
+            <option value="PSM">PSM</option>
+            <option value="AISafety">AI Safety</option>
+          </select>
+
+          <select
+            value={filters.type || ''}
+            onChange={(e) => handleFilterChange('type', e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          >
+            <option value="">All Types</option>
+            <option value="internal">Internal</option>
+            <option value="external">External</option>
+            <option value="regulatory">Regulatory</option>
+            <option value="management">Management</option>
+            <option value="process">Process</option>
+          </select>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Audits</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {stats?.total || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+      {isLoading ? (
+        <LoadingSpinner className="min-h-[400px]" size="lg" />
+      ) : (
+        <>
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Audits</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats?.total || 0}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-blue-600" />
+                </div>
               </div>
             </div>
-          </Card>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">In Progress</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {stats?.inProgress || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-300" />
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avg Compliance</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    {Math.round(stats?.avgCompliance || 0)}%
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-green-600" />
+                </div>
               </div>
             </div>
-          </Card>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Compliance</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {Math.round(stats?.avgCompliance || 0)}%
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-300" />
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Observations</p>
+                  <p className="text-3xl font-bold text-orange-600">
+                    {stats?.observations?.total || 0}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="h-6 w-6 text-orange-600" />
+                </div>
               </div>
             </div>
-                    </Card>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="p-6">
-            <Link to={`/audit/my-actions`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Open Actions</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {(stats?.observations?.assigned || 0) + (stats?.observations?.open || 0)}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-300" />
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">In Progress</p>
+                  <p className="text-3xl font-bold text-purple-600">
+                    {stats?.inProgress || 0}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Users className="h-6 w-6 text-purple-600" />
+                </div>
               </div>
             </div>
-            </Link>
-          </Card>
-        </motion.div>
-      </div>
+          </div>
 
-      {/* Audit Status Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Audit Status Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <Card className="p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
             <BarChart3 className="h-5 w-5 mr-2" />
@@ -253,165 +342,186 @@ const AuditDashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Recent Audits */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-            <FileText className="h-5 w-5 mr-2" />
-            Recent Audits
-          </h2>
-          <Button
-            as={Link}
-            to="/audit/audits"
-            variant="secondary"
-            size="sm"
-          >
-            View All
-          </Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Audit
-                </th>
-                <th className="text-left py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Plant
-                </th>
-                <th className="text-left py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Auditor
-                </th>
-                <th className="text-left py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Status
-                </th>
-                <th className="text-left py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Date
-                </th>
-                <th className="text-left py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {stats?.recentAudits?.map((audit: any) => (
-                <tr key={audit._id}>
-                  <td className="py-3">
-                    <div>
-                      <Link
-                        to={`/audit/audits/${audit._id}`}
-                        className="font-medium text-gray-900 dark:text-white hover:text-blue-600"
-                      >
-                        {audit.auditNumber}
-                      </Link>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {audit.title}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="py-3 text-sm text-gray-900 dark:text-white">
-                    {audit.plantId?.name}
-                  </td>
-                  <td className="py-3 text-sm text-gray-900 dark:text-white">
-                    {audit.auditor?.name}
-                  </td>
-                  <td className="py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      audit.status === 'completed' || audit.status === 'closed' ? 'bg-green-100 text-green-800' :
-                      audit.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                      audit.status === 'checklist_completed' ? 'bg-purple-100 text-purple-800' :
-                      audit.status === 'observations_pending' ? 'bg-orange-100 text-orange-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {audit.status.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="py-3 text-sm text-gray-900 dark:text-white">
-                    {format(new Date(audit.scheduledDate), 'MMM dd, yyyy')}
-                  </td>
-                  <td className="py-3">
-                    <Button
-                      as={Link}
-                      to={`/audit/audits/${audit._id}`}
-                      variant="secondary"
-                      size="sm"
-                      icon={Eye}
-                    >
-                      View
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {(!stats?.recentAudits || stats.recentAudits.length === 0) && (
-            <div className="text-center py-8">
-              <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">No recent audits</p>
+
+          {/* Charts Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Monthly Trends */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Calendar className="h-5 w-5 mr-2 text-blue-600" />
+                Monthly Trends
+              </h3>
+              {data.monthlyTrends && data.monthlyTrends.length > 0 ? (
+                <MonthlyTrendChart data={data.monthlyTrends} type="combined" height={350} />
+              ) : (
+                <div className="h-[350px] flex items-center justify-center text-gray-500">
+                  No trend data available
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </Card>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 text-center">
-          <CheckSquare className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            My Action Items
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            View and complete observations assigned to you
-          </p>
-          <Button
-            as={Link}
-            to="/audit/my-actions"
-            variant="primary"
-            size="sm"
-          >
-            View My Actions
-          </Button>
-        </Card>
+            {/* Category Radar */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Target className="h-5 w-5 mr-2 text-green-600" />
+                Category Analysis
+              </h3>
+              {data.categoryAnalysis && data.categoryAnalysis.length > 0 ? (
+                <CategoryRadarChart data={data.categoryAnalysis} height={350} />
+              ) : (
+                <div className="h-[350px] flex items-center justify-center text-gray-500">
+                  No category data available
+                </div>
+              )}
+            </div>
+          </div>
 
-        {user?.role === 'plant_head' && <Card className="p-6 text-center">
-          <Plus className="h-12 w-12 text-green-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Manage Templates
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Manage templates for your plant
-          </p>
-          <Button
-            as={Link}
-            to="/audit/templates"
-            variant="primary"
-            size="sm"
-          >
-            Manage Templates
-          </Button>
-        </Card>}
+          {/* Department Compliance */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+              Department-wise Compliance
+            </h3>
+            {data.departmentCompliance && data.departmentCompliance.length > 0 ? (
+              <ComplianceMatrix data={data.departmentCompliance} height={400} />
+            ) : (
+              <div className="h-[400px] flex items-center justify-center text-gray-500">
+                No department compliance data available
+              </div>
+            )}
+          </div>
 
-        <Card className="p-6 text-center">
-          <BarChart3 className="h-12 w-12 text-green-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            View All Audits
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Browse and manage all audits in your organization
-          </p>
-          <Button
-            as={Link}
-            to="/audit/audits"
-            variant="secondary"
-            size="sm"
-          >
-            View All Audits
-          </Button>
-        </Card>
-      </div>
+          {/* Clause Analysis */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <CheckSquare className="h-5 w-5 mr-2 text-purple-600" />
+              Clause-wise Non-Conformances
+            </h3>
+            {data.clauseCompliance && data.clauseCompliance.length > 0 ? (
+              <ClauseComplianceChart data={data.clauseCompliance} height={450} />
+            ) : (
+              <div className="h-[450px] flex items-center justify-center text-gray-500">
+                No clause compliance data available
+              </div>
+            )}
+          </div>
+
+          {/* Compliance Heatmap */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Activity className="h-5 w-5 mr-2 text-red-600" />
+              Department vs Clause Compliance Matrix
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Heat map showing non-conformances by department and clause (0 = compliant, higher numbers = more issues)
+            </p>
+            {data.complianceHeatmap && data.complianceHeatmap.data.length > 0 ? (
+              <ComplianceHeatmap 
+                data={data.complianceHeatmap.data} 
+                clauseHeaders={data.complianceHeatmap.clauseHeaders} 
+              />
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-500">
+                No heatmap data available
+              </div>
+            )}
+          </div>
+
+          {/* Recent Audits Summary */}
+          <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-gray-600" />
+              Recent Audit Summary
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Audit Number
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Department
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Compliance
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Observations
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {data.recentAudits?.map((audit: any) => (
+                    <tr key={audit._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {audit.auditNumber}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {audit.plantId?.name || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {format(new Date(audit.scheduledDate), 'MMM dd, yyyy')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          (audit.summary?.compliancePercentage || 0) >= 90 
+                            ? 'bg-green-100 text-green-800'
+                            : (audit.summary?.compliancePercentage || 0) >= 75
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {audit.summary?.compliancePercentage || 0}%
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {audit.observations?.length || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          audit.status === 'completed' || audit.status === 'closed' 
+                            ? 'bg-green-100 text-green-800'
+                            : audit.status === 'in_progress' 
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {audit.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <Link
+                         to={`/audit/audits/${audit._id}`}
+                         className="text-blue-600 hover:text-blue-900 flex items-center transition-colors">
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              {(!data.recentAudits || data.recentAudits.length === 0) && (
+                <div className="text-center py-8">
+                  <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">No recent audits available</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
-};
+}
 
-export default AuditDashboard;
+export default App;

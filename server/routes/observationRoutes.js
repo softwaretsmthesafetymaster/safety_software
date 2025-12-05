@@ -10,7 +10,6 @@ const router = express.Router();
 // Get observations for an audit
 router.get('/:companyId/audit/:auditId', authenticate, checkCompanyAccess, async (req, res) => {
   try {
-    console.log(req.params);
     const { companyId, auditId } = req.params;
     const { status, riskLevel } = req.query;
 
@@ -24,7 +23,6 @@ router.get('/:companyId/audit/:auditId', authenticate, checkCompanyAccess, async
       .populate('completionDetails.completedBy', 'name')
       .populate('approvalDetails.approvedBy', 'name')
       .sort({ createdAt: -1 });
-    console.log(observations);
     res.json({ observations });
   } catch (error) {
     res.status(500).json({ message: error.message });

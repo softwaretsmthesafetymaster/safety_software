@@ -37,7 +37,7 @@ const worksheetRowSchema = new mongoose.Schema({
   recommendation: { type: String, required: true },
   actionOwner: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' ,
+    ref: 'User',
     default: null
   },
   targetDate: { type: Date },
@@ -47,7 +47,10 @@ const worksheetRowSchema = new mongoose.Schema({
     default: 'Open' 
   },
   completedDate: { type: Date },
-  remarks: { type: String }
+  remarks: { type: String },
+  actualCompletionDate: { type: Date },
+  completionEvidence: { type: String },
+  reviewComments: { type: String }
 });
 
 const hiraSchema = new mongoose.Schema({
@@ -73,7 +76,7 @@ const hiraSchema = new mongoose.Schema({
   title: { type: String, required: true },
   process: { type: String, required: true },
   description: { type: String },
-  
+  priority: { type: String, enum: ['low', 'medium', 'high','urgent'], default: 'medium' },
   // Assessment team
   assessor: {
     type: mongoose.Schema.Types.ObjectId,
@@ -95,8 +98,13 @@ const hiraSchema = new mongoose.Schema({
   // Workflow status
   status: { 
     type: String, 
-    enum: ['draft', 'assigned', 'in_progress', 'completed', 'approved', 'rejected', 'closed'],
+    enum: ['draft', 'assigned', 'in_progress', 'completed', 'approved', 'rejected', 'closed', 'actions_assigned', 'actions_completed'],
     default: 'draft' 
+  },
+
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   },
   
   // Approval workflow
@@ -118,6 +126,8 @@ const hiraSchema = new mongoose.Schema({
   completedAt: Date,
   approvedAt: Date,
   closedAt: Date,
+  actionsAssignedAt: Date,
+  actionsCompletedAt: Date,
   
   // Approval details
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -141,6 +151,15 @@ const hiraSchema = new mongoose.Schema({
     lowRiskCount: { type: Number, default: 0 },
     significantRisks: { type: Number, default: 0 },
     totalRecommendations: { type: Number, default: 0 }
+  },
+
+  // Actions summary
+  actionsSummary: {
+    totalActions: { type: Number, default: 0 },
+    openActions: { type: Number, default: 0 },
+    inProgressActions: { type: Number, default: 0 },
+    completedActions: { type: Number, default: 0 },
+    overdueActions: { type: Number, default: 0 }
   }
 }, { 
   timestamps: true,
@@ -183,6 +202,21 @@ hiraSchema.pre('save', function(next) {
   ).length;
   this.riskSummary.totalRecommendations = this.worksheetRows.filter(row => 
     row.recommendation && row.recommendation.trim() !== ''
+  ).length;
+
+  // Update actions summary
+  const actionsRows = this.worksheetRows.filter(row => row.recommendation && row.recommendation.trim() !== '');
+  this.actionsSummary.totalActions = actionsRows.length;
+  this.actionsSummary.openActions = actionsRows.filter(row => row.actionStatus === 'Open').length;
+  this.actionsSummary.inProgressActions = actionsRows.filter(row => row.actionStatus === 'In Progress').length;
+  this.actionsSummary.completedActions = actionsRows.filter(row => row.actionStatus === 'Completed').length;
+  
+  // Calculate overdue actions
+  const now = new Date();
+  this.actionsSummary.overdueActions = actionsRows.filter(row => 
+    row.targetDate && 
+    row.actionStatus !== 'Completed' && 
+    new Date(row.targetDate) < now
   ).length;
   
   next();

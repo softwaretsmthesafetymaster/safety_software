@@ -40,23 +40,11 @@ const Register: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isLoading, error } = useAppSelector((state) => state.auth);
   const [step, setStep] = useState(1);
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
-  const [totalAmount, setTotalAmount] = useState(0);
+  
 
   const { register, handleSubmit, watch, formState: { errors }, trigger } = useForm<RegisterForm>();
 
-  useEffect(() => {
-    // Get selected modules from localStorage
-    const modules = localStorage.getItem('selectedModules');
-    const amount = localStorage.getItem('totalAmount');
-    
-    if (modules) {
-      setSelectedModules(JSON.parse(modules));
-    }
-    if (amount) {
-      setTotalAmount(parseInt(amount));
-    }
-  }, []);
+ 
 
   const password = watch('password');
 
@@ -68,8 +56,6 @@ const Register: React.FC = () => {
       industry: data.industry,
       address: data.address,
       contactInfo: data.contactInfo,
-      // selectedModules,
-      // totalAmount,
     };
 
     const company = await dispatch(createCompany(companyData)).unwrap();
@@ -424,18 +410,6 @@ const Register: React.FC = () => {
                     />
                   </div>
                 </div>
-
-                {/* Selected Modules Summary */}
-                {selectedModules.length > 0 && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                    <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-                      Selected Modules ({selectedModules.length})
-                    </h4>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
-                      Total: <span className="font-semibold text-blue-600">${totalAmount}/month</span>
-                    </div>
-                  </div>
-                )}
 
                 {error && (
                   <motion.div

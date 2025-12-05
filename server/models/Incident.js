@@ -18,7 +18,7 @@ const incidentSchema = new mongoose.Schema({
   },
   areaId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Plant.areas'
+    ref: 'Area'
   },
   reportedBy: {
     type: mongoose.Schema.Types.ObjectId,

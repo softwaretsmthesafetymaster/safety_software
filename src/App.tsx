@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect,useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
@@ -30,6 +30,7 @@ import PermitDetails from './pages/PTW/PermitDetails';
 import PermitApproval from './pages/PTW/PermitApproval';
 import PermitClosure from './pages/PTW/PermitClosure';
 import PermitStop from './pages/PTW/PermitStop';
+import ChecklistManager from './pages/PTW/Checklist';
 
 // IMS Module
 import IncidentDashboard from './pages/IMS/IncidentDashboard';
@@ -106,43 +107,41 @@ import CompanyConfigAdmin from './pages/Platform/CompanyConfig';
 
 // Notification Pages
 import NotificationCenter from './pages/Notifications/NotificationCenter';
+import PermitActivation from './pages/PTW/PermitActivation';
+import PermitExtension from './pages/PTW/PermitExtension';
 
 
 
 
 const AppContent: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user, isLoading: authLoading } = useAppSelector((state) => state.auth);
+  const { currentCompany, isLoading: companyLoading } = useAppSelector((state) => state.company);
   const { theme } = useAppSelector((state) => state.ui);
-  const { currentCompany } = useAppSelector((state) => state.company);
+
+
+  // Apply theme
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   }, [theme]);
 
+  // Fetch user profile on mount
+useEffect(() => {
+  dispatch(fetchUserProfile());
+}, [dispatch]);
+
+  // Fetch company data and related resources
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token && !user) {
-      dispatch(fetchUserProfile());
+    if (!user || user.role === 'platform_owner') return;
+    if (user.companyId && !currentCompany) {
+      dispatch(fetchCompanyById(user.companyId));
+      dispatch(fetchPlants({ companyId: user.companyId }));
+      dispatch(fetchUsers({ companyId: user.companyId }));
     }
-  }, [dispatch]);
+  }, [dispatch, user, currentCompany]);
 
-  
-
-  useEffect(() => {
-    if (user?.companyId && !currentCompany) {
-      Promise.all([
-        dispatch(fetchCompanyById(user.companyId)),
-        dispatch(fetchPlants({ companyId: user.companyId })),
-        dispatch(fetchUsers({ companyId: user.companyId }))
-      ]);
-    }
-  }, [dispatch, user?.companyId, currentCompany]);
-
-  
+ 
   return (
     <div className={`app ${theme}`}>
       <div className="app-content">
@@ -218,6 +217,16 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
+              path="/ptw/permits/checklist"
+              element={
+                <PrivateRoute requiredModule="ptw" requiredRole={['safety_incharge', 'plant_head', 'hod']}>
+                  <Layout>
+                    <ChecklistManager/>
+                  </Layout>
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/ptw/permits/:id/approve"
               element={
                 <PrivateRoute requiredModule="ptw" requiredRole={['safety_incharge', 'plant_head', 'hod']}>
@@ -247,6 +256,27 @@ const AppContent: React.FC = () => {
                 </PrivateRoute>
               }
             />
+            <Route
+              path="/ptw/permits/:id/extend"
+              element={
+                <PrivateRoute requiredModule="ptw" requiredRole={['safety_incharge', 'plant_head', 'hod']}>
+                  <Layout>
+                    <PermitExtension />
+                  </Layout>
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/ptw/permits/:id/activate"
+              element={
+                <PrivateRoute requiredModule="ptw" requiredRole={[]}>
+                  <Layout>
+                    <PermitActivation />
+                  </Layout>
+                </PrivateRoute>
+              }
+            />
+
 
             {/* IMS Module Routes */}
             <Route

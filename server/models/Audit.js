@@ -18,7 +18,7 @@ const auditSchema = new mongoose.Schema({
   },
   areaId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Plant.areas'
+    ref: 'Area'
   },
   templateId: {
     type: mongoose.Schema.Types.ObjectId,

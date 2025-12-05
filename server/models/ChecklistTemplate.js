@@ -87,6 +87,6 @@ const checklistTemplateSchema = new mongoose.Schema({
 });
 
 checklistTemplateSchema.index({ companyId: 1, standard: 1, isActive: 1 });
-checklistTemplateSchema.index({ code: 1 });
+// checklistTemplateSchema.index({ code: 1 });
 
 export default mongoose.model('ChecklistTemplate', checklistTemplateSchema);

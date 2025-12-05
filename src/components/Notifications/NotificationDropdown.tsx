@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, X, AlertTriangle, Info, CheckCircle, Clock } from 'lucide-react';
+import { Bell, X, AlertTriangle, Info, CheckCircle, Clock } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
 import { fetchNotifications, markAsRead, markAllAsRead } from '../../store/slices/notificationSlice';
 import { format, isValid } from 'date-fns';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+
 const NotificationDropdown: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { notifications, unreadCount } = useAppSelector((state) => state.notification);
+  const navigate= useNavigate()
   const [isOpen, setIsOpen] = useState(false);
+  const [clickLocked, setClickLocked] = useState(false); // UPDATED
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,10 +48,21 @@ const NotificationDropdown: React.FC = () => {
     }
   };
 
-  const handleMarkAsRead = (notificationId: string) => {
+  // UPDATED
+  const handleNotificationClick = async (notification: any) => {
+    if (clickLocked) return;
+
+    setClickLocked(true);
+
     if (user?.companyId) {
-      dispatch(markAsRead({ companyId: user.companyId, notificationId }));
+      await dispatch(markAsRead({ companyId: user.companyId, notificationId: notification._id }));
     }
+
+    if (notification?.actionUrl) {
+      navigate(notification.actionUrl);
+    }
+
+    setTimeout(() => setClickLocked(false), 500);
   };
 
   const handleMarkAllAsRead = () => {
@@ -81,21 +96,13 @@ const NotificationDropdown: React.FC = () => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute -right-12 lg:right-0 mt-2 w-60 lg:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-hidden"
+            className="absolute -right-24 lg:right-0 mt-2 w-72 lg:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-hidden"
           >
-            {/* Header */}
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Notifications
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notifications</h3>
+
               
-              <Link
-                to={'/notifications'}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  View All
-              </Link>
-                
+
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllAsRead}
@@ -106,7 +113,6 @@ const NotificationDropdown: React.FC = () => {
               )}
             </div>
 
-            {/* Notifications List */}
             <div className="max-h-80 overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="px-4 py-8 text-center">
@@ -123,36 +129,33 @@ const NotificationDropdown: React.FC = () => {
                       className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
                         !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                       }`}
-                      onClick={() => handleMarkAsRead(notification._id)}
+                      onClick={() => handleNotificationClick(notification)} // UPDATED
                     >
                       <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-1">
-                          {getNotificationIcon(notification.type)}
-                        </div>
+                        <div className="flex-shrink-0 mt-1">{getNotificationIcon(notification.type)}</div>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${
-                            !notification.read 
-                              ? 'text-gray-900 dark:text-white' 
-                              : 'text-gray-600 dark:text-gray-300'
-                          }`}>
+                          <p
+                            className={`text-sm font-medium ${
+                              !notification.read
+                                ? 'text-gray-900 dark:text-white'
+                                : 'text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
                             {notification.title}
                           </p>
+
                           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                             {notification.message}
                           </p>
-                          
+
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                             {isValid(new Date(notification?.createdAt))
                               ? format(new Date(notification.createdAt), 'MMM dd, yyyy HH:mm')
                               : 'Invalid Date'}
                           </p>
-
                         </div>
-                        {!notification.read && (
-                          <div className="flex-shrink-0">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          </div>
-                        )}
+
+                        {!notification.read && <div className="w-2 h-2 bg-blue-500 rounded-full" />}
                       </div>
                     </motion.div>
                   ))}
@@ -160,11 +163,12 @@ const NotificationDropdown: React.FC = () => {
               )}
             </div>
 
-            {/* Footer */}
             {notifications.length > 0 && (
               <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                <Link to={'/notifications'}
-                 className="text-sm text-blue-600 dark:text-blue-400 hover:underline w-full text-center">
+                <Link
+                  to={'/notifications'}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline w-full text-center"
+                >
                   View all notifications
                 </Link>
               </div>

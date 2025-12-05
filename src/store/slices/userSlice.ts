@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
+axios.defaults.withCredentials = true;
 interface User {
   _id: string;
   name: string;
@@ -96,7 +96,6 @@ export const createUser = createAsyncThunk(
   async ({ companyId, userData }: { companyId: string; userData: any }, { rejectWithValue }) => {
     try {
       const response = await axios.post(`${API_URL}/users/${companyId}`, userData);
-      console.log('User created:', response);
       return response.data.user;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create user');

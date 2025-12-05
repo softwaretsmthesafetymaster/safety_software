@@ -23,7 +23,7 @@ import { format } from 'date-fns';
 const IncidentList: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { incidents, isLoading, pagination } = useAppSelector((state) => state.incident);
+  const { incidents, isLoading, pagination,totalPages } = useAppSelector((state) => state.incident);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -334,7 +334,7 @@ const IncidentList: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
+        {totalPages > 1 && (
           <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
             <div className="flex-1 flex justify-between sm:hidden">
               <Button

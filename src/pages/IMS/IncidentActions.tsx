@@ -67,7 +67,7 @@ const IncidentActions: React.FC = () => {
       await dispatch(updateIncident({
         companyId: user.companyId,
         id,
-        data: {
+        updateData: {
           ...data,
           status: 'actions_assigned'
         }

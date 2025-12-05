@@ -11,6 +11,13 @@ const permitSchema = new mongoose.Schema({
     enum: ['hot_work', 'cold_work', 'electrical', 'confined_space', 'working_at_height', 'excavation']
   }],
   isHighRisk: { type: Boolean, default: false },
+  checklists: {
+    riskAssociated: [String],
+    precautions: [String],
+    ppeRequired: [String],
+    inspectionChecklist: [String],
+    rescueTechniques: [String]
+  },
   workDescription: { type: String, required: true },
   location: { area: String, specificLocation: String },
   contractor: { name: String, contact: String, license: String },
@@ -37,7 +44,7 @@ const permitSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: [
-      'draft','pending','pending-hod','submitted', 'in-progress', 'approved', 'active', 'expired',
+      'draft','pending','pending-hod','submitted', 'in-progress', 'approved','rejected', 'active', 'expired',
       'closed', 'cancelled', 'stopped', 'pending_closure', 'extension-pending'
     ],
     default: 'draft'

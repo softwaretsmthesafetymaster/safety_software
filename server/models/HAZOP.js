@@ -18,7 +18,7 @@ const hazopSchema = new mongoose.Schema({
   },
   areaId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Plant.areas'
+    ref: 'Area'
   },
   chairman: {
     type: mongoose.Schema.Types.ObjectId,

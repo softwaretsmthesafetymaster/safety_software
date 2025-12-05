@@ -10,6 +10,7 @@ import {
   User,
   Download
 } from 'lucide-react';
+import axios from 'axios';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
 import { addNotification } from '../../store/slices/uiSlice';
 import Card from '../../components/UI/Card';
@@ -18,7 +19,7 @@ import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import { format } from 'date-fns';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-
+axios.defaults.withCredentials = true;
 interface Template {
   _id: string;
   name: string;
@@ -62,15 +63,10 @@ const TemplateDetail: React.FC = () => {
   const fetchTemplate = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_URL}/templates/${user?.companyId}/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await axios.get(`${API_URL}/templates/${user?.companyId}/${id}`);
       
-      if (response.ok) {
-        const data = await response.json();
-        setTemplate(data.template);
+      if (response.status === 200) {
+        setTemplate(response.data.template);
       } else {
         throw new Error('Template not found');
       }

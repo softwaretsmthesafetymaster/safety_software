@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
 import {
   CheckCircle,
   XCircle,
@@ -11,19 +12,23 @@ import {
   MessageSquare,
   User,
   Calendar,
-  MapPin
+  MapPin,
+  Shield,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
 import { fetchPermitById, approvePermit } from '../../store/slices/permitSlice';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
-import { addNotification } from '../../store/slices/uiSlice';
 import { format } from 'date-fns';
+import { useFieldArray } from 'react-hook-form';
 
 interface ApprovalData {
   decision: 'approve' | 'reject';
   comments: string;
+  conditions: string[];
 }
 
 const PermitApproval: React.FC = () => {
@@ -32,10 +37,19 @@ const PermitApproval: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { currentPermit, isLoading } = useAppSelector((state) => state.permit);
-  const { currentCompany } = useAppSelector((state) => state.company);
   const [decision, setDecision] = useState<'approve' | 'reject' | ''>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ApprovalData>();
+  const { register, handleSubmit, control, formState: { errors } } = useForm<ApprovalData>({
+    defaultValues: {
+      conditions: ['']
+    }
+  });
+
+  const { fields: conditionFields, append: appendCondition, remove: removeCondition } = useFieldArray({
+    control,
+    name: 'conditions'
+  });
 
   useEffect(() => {
     if (id && user?.companyId) {
@@ -46,24 +60,22 @@ const PermitApproval: React.FC = () => {
   const onSubmit = async (data: ApprovalData) => {
     if (!user?.companyId || !id || !decision) return;
 
+    setIsSubmitting(true);
     try {
       await dispatch(approvePermit({
         companyId: user.companyId,
         id,
         decision,
-        comments: data.comments
+        comments: data.comments,
+        conditions: decision === 'approve' ? data.conditions.filter(c => c.trim()) : []
       })).unwrap();
       
-      dispatch(addNotification({
-        type: 'success',
-        message: `Permit ${decision}d successfully`
-      }));
+      toast.success(`Permit ${decision}d successfully`);
       navigate('/ptw/permits');
     } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to process approval'
-      }));
+      toast.error(error.message || 'Failed to process approval');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -82,7 +94,21 @@ const PermitApproval: React.FC = () => {
   }
 
   const currentApproval = currentPermit.approvals?.find(app => app.status === 'pending');
-  const ptwConfig = currentCompany?.config?.modules?.ptw;
+  const canApprove = currentApproval && String(currentApproval.approver?._id) === String(user?._id);
+
+  if (!canApprove) {
+    return (
+      <div className="text-center py-12">
+        <AlertTriangle className="mx-auto h-24 w-24 text-yellow-400" />
+        <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+          Not Authorized
+        </h3>
+        <p className="mt-2 text-gray-500 dark:text-gray-400">
+          You are not authorized to approve this permit.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -194,7 +220,7 @@ const PermitApproval: React.FC = () => {
           {/* Safety Review */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-              <AlertTriangle className="h-5 w-5 mr-2" />
+              <Shield className="h-5 w-5 mr-2" />
               Safety Review
             </h2>
             
@@ -398,6 +424,44 @@ const PermitApproval: React.FC = () => {
                 </div>
               </div>
 
+              {/* Approval Conditions (only for approve) */}
+              {/* {decision === 'approve' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Approval Conditions (Optional)
+                  </label>
+                  <div className="space-y-2">
+                    {conditionFields.map((field, index) => (
+                      <div key={field.id} className="flex items-center space-x-2">
+                        <input
+                          {...register(`conditions.${index}` as const)}
+                          type="text"
+                          className="flex-1 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                          placeholder="Enter approval condition..."
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => removeCondition(index)}
+                          disabled={conditionFields.length === 1}
+                        />
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={Plus}
+                      onClick={() => appendCondition('')}
+                    >
+                      Add Condition
+                    </Button>
+                  </div>
+                </div>
+              )} */}
+
               <div>
                 <label htmlFor="comments" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Comments *
@@ -419,7 +483,7 @@ const PermitApproval: React.FC = () => {
                 type="submit"
                 variant={decision === 'approve' ? 'success' : 'danger'}
                 className="w-full"
-                loading={isLoading}
+                loading={isSubmitting}
                 disabled={!decision}
                 icon={decision === 'approve' ? CheckCircle : XCircle}
               >
@@ -447,7 +511,7 @@ const PermitApproval: React.FC = () => {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      Step {approval.step} - {approval.status.toUpperCase()}
+                      {approval.label || `Step ${approval.step}`} - {approval.status.toUpperCase()}
                     </p>
                     {approval.approver && (
                       <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -463,6 +527,16 @@ const PermitApproval: React.FC = () => {
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
                         "{approval.comments}"
                       </p>
+                    )}
+                    {approval.conditions && approval.conditions.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Conditions:</p>
+                        <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc list-inside">
+                          {approval.conditions.map((condition, idx) => (
+                            <li key={idx}>{condition}</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -504,6 +578,12 @@ const PermitApproval: React.FC = () => {
                 <span className="text-gray-600 dark:text-gray-400">Current Step:</span>
                 <span className="text-gray-900 dark:text-white">
                   {currentApproval?.step || 'N/A'} of {currentPermit.approvals?.length || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Your Role:</span>
+                <span className="text-gray-900 dark:text-white">
+                  {currentApproval?.role || 'N/A'}
                 </span>
               </div>
             </div>

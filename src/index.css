@@ -46,7 +46,7 @@
   }
 
   .card-modern {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-smooth hover:shadow-smooth-lg transition-all duration-300 border border-gray-100 dark:border-gray-700;
+    @apply bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700;
   }
 
   .btn-modern {

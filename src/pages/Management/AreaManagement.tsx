@@ -1,16 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  MapPin,
-  AlertTriangle,
-  Building,
-  User,
-} from 'lucide-react';
+import { Plus, Search, CreditCard as Edit, Trash2, MapPin, AlertTriangle, Building, User } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
 import {
   getArea,
@@ -25,13 +16,21 @@ import LoadingSpinner from '../../components/UI/LoadingSpinner';
 import { useForm } from 'react-hook-form';
 import { addNotification } from '../../store/slices/uiSlice';
 
-// 1. Update the interface to include new fields
 interface AreaFormData {
   name: string;
   code: string;
   description: string;
-  hod: string;
-  safetyIncharge: string;
+  personnel: {
+    hod: string;
+    safetyIncharge: string;
+    supervisor: string;
+  };
+  riskProfile: {
+    level: 'low' | 'medium' | 'high' | 'critical';
+  };
+  capacity: {
+    maxPersonnel: number;
+  };
 }
 
 const AreaManagement: React.FC = () => {
@@ -101,8 +100,11 @@ const AreaManagement: React.FC = () => {
     setEditingArea(area);
     reset({
       ...area,
-      hod: area.hod?._id || '',
-      safetyIncharge: area.safetyIncharge?._id || '',
+      personnel: {
+        hod: area.personnel?.hod?._id || '',
+        safetyIncharge: area.personnel?.safetyIncharge?._id || '',
+        supervisor: area.personnel?.supervisor?._id || '',
+      }
     });
     setShowForm(true);
   };
@@ -142,6 +144,16 @@ const AreaManagement: React.FC = () => {
     return <LoadingSpinner className="min-h-screen" />;
   }
 
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -150,7 +162,7 @@ const AreaManagement: React.FC = () => {
             Area Management
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage plant areas
+            Manage plant areas and personnel assignments
           </p>
         </div>
         <Button
@@ -183,88 +195,140 @@ const AreaManagement: React.FC = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
         >
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
+            className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
           >
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
               {editingArea ? 'Edit Area' : 'Add New Area'}
             </h2>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Area Name *
-                </label>
-                <input
-                  {...register('name', { required: 'Area name is required' })}
-                  type="text"
-                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                />
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-                )}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Area Name *
+                  </label>
+                  <input
+                    {...register('name', { required: 'Area name is required' })}
+                    type="text"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter area name"
+                  />
+                  {errors.name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Area Code *
+                  </label>
+                  <input
+                    {...register('code', { required: 'Area code is required' })}
+                    type="text"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter area code"
+                  />
+                  {errors.code && (
+                    <p className="mt-1 text-sm text-red-600">{errors.code.message}</p>
+                  )}
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Area Code *
-                </label>
-                <input
-                  {...register('code', { required: 'Area code is required' })}
-                  type="text"
-                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                />
-                {errors.code && (
-                  <p className="mt-1 text-sm text-red-600">{errors.code.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Description
                 </label>
                 <textarea
                   {...register('description')}
                   rows={3}
-                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Enter area description"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Area HOD
-                </label>
-                <select
-                  {...register('hod')}
-                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="">Select Area HOD</option>
-                  {plantUsers?.map(user => (
-                    <option key={user._id} value={user._id}>{user.name}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Risk Level
+                  </label>
+                  <select
+                    {...register('riskProfile.level')}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Max Personnel
+                  </label>
+                  <input
+                    {...register('capacity.maxPersonnel', { valueAsNumber: true })}
+                    type="number"
+                    min="1"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Enter max personnel"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Safety Incharge
-                </label>
-                <select
-                  {...register('safetyIncharge')}
-                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="">Select Safety Incharge</option>
-                  {plantUsers?.map(user => (
-                    <option key={user._id} value={user._id}>{user.name}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Area HOD
+                  </label>
+                  <select
+                    {...register('personnel.hod')}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">Select HOD</option>
+                    {plantUsers?.map(user => (
+                      <option key={user._id} value={user._id}>{user.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Safety Incharge
+                  </label>
+                  <select
+                    {...register('personnel.safetyIncharge')}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">Select Safety Incharge</option>
+                    {plantUsers?.map(user => (
+                      <option key={user._id} value={user._id}>{user.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Supervisor
+                  </label>
+                  <select
+                    {...register('personnel.supervisor')}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">Select Supervisor</option>
+                    {plantUsers?.map(user => (
+                      <option key={user._id} value={user._id}>{user.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
+              <div className="flex justify-end space-x-4 pt-6">
                 <Button
                   type="button"
                   variant="secondary"
@@ -300,9 +364,12 @@ const AreaManagement: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card hover className="p-6">
+            <Card hover className="p-6 h-full">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                    <MapPin className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {area.name}
@@ -331,18 +398,51 @@ const AreaManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mb-4 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                {area.description && <p>{area.description}</p>}
-                {area.hod && (
+              {area.description && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  {area.description}
+                </p>
+              )}
+
+              <div className="space-y-3 mb-4">
+                {area.personnel?.hod && (
                   <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4" />
-                    <span>HOD: <strong>{area.hod.name}</strong></span>
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      HOD: <strong>{area.personnel.hod.name}</strong>
+                    </span>
                   </div>
                 )}
-                {area.safetyIncharge && (
+
+                {area.personnel?.safetyIncharge && (
                   <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4" />
-                    <span>Safety Incharge: <strong>{area.safetyIncharge.name}</strong></span>
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Safety: <strong>{area.personnel.safetyIncharge.name}</strong>
+                    </span>
+                  </div>
+                )}
+
+                {area.personnel?.supervisor && (
+                  <div className="flex items-center space-x-2">
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Supervisor: <strong>{area.personnel.supervisor.name}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  getRiskColor(area.riskProfile?.level || 'medium')
+                }`}>
+                  {area.riskProfile?.level?.toUpperCase() || 'MEDIUM'} Risk
+                </div>
+                
+                {area.capacity?.maxPersonnel && (
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Max: {area.capacity.maxPersonnel} people
                   </div>
                 )}
               </div>

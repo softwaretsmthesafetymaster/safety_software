@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
 import {
   Save,
   CheckCircle,
+  XCircle,
   Clock,
   FileText,
   Camera,
@@ -17,7 +19,6 @@ import { fetchPermitById, closePermit } from '../../store/slices/permitSlice';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
-import { addNotification } from '../../store/slices/uiSlice';
 import { format } from 'date-fns';
 import { useExport } from '../../hooks/useExport';
 
@@ -30,7 +31,7 @@ interface ClosureData {
   closureEvidence: string;
   closurePhotos: string[];
   closureComments: string;
-  approvalDecision?: string;
+  actualEndTime: string;
 }
 
 const PermitClosure: React.FC = () => {
@@ -39,8 +40,8 @@ const PermitClosure: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { currentPermit, isLoading } = useAppSelector((state) => state.permit);
-  const { currentCompany } = useAppSelector((state) => state.company);
   const { exportItem, isExporting } = useExport();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<ClosureData>();
 
@@ -53,6 +54,7 @@ const PermitClosure: React.FC = () => {
   const onSubmit = async (data: ClosureData) => {
     if (!user?.companyId || !id) return;
 
+    setIsSubmitting(true);
     try {
       await dispatch(closePermit({
         companyId: user.companyId,
@@ -60,39 +62,32 @@ const PermitClosure: React.FC = () => {
         closureData: data
       })).unwrap();
       
-      dispatch(addNotification({
-        type: 'success',
-        message: 'Permit closure submitted successfully'
-      }));
+      toast.success('Permit closure submitted successfully');
       navigate('/ptw/permits');
     } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to submit closure'
-      }));
+      toast.error(error.message || 'Failed to submit closure');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleApproval = async (decision: 'approve' | 'reject') => {
     if (!user?.companyId || !id) return;
 
+    setIsSubmitting(true);
     try {
       await dispatch(closePermit({
         companyId: user.companyId,
         id,
-        closureData: { approvalDecision: decision }
+        approvalDecision: decision
       })).unwrap();
       
-      dispatch(addNotification({
-        type: 'success',
-        message: `Permit ${decision === 'approve' ? 'closed' : 'reassigned'} successfully`
-      }));
+      toast.success(`Permit ${decision === 'approve' ? 'closed' : 'reassigned'} successfully`);
       navigate('/ptw/permits');
     } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to process closure'
-      }));
+      toast.error(error.message || 'Failed to process closure');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -101,15 +96,9 @@ const PermitClosure: React.FC = () => {
     
     try {
       await exportItem(currentPermit, 'permit', format);
-      dispatch(addNotification({
-        type: 'success',
-        message: `Permit exported as ${format.toUpperCase()} successfully`
-      }));
+      toast.success(`Permit exported as ${format.toUpperCase()} successfully`);
     } catch (error) {
-      dispatch(addNotification({
-        type: 'error',
-        message: 'Failed to export permit'
-      }));
+      toast.error('Failed to export permit');
     }
   };
 
@@ -127,7 +116,26 @@ const PermitClosure: React.FC = () => {
     );
   }
 
-  const isApprovalMode = currentPermit.status === 'pending_closure' 
+  const isApprovalMode = currentPermit.status === 'pending_closure';
+  const canSubmitClosure = ['active', 'expired'].includes(currentPermit.status) &&
+                          (String(currentPermit.requestedBy._id) === String(user?._id) ||
+                           ['hod', 'safety_incharge','plant_head'].includes(user?.role || ''));
+  
+  const canApproveClosure = isApprovalMode && ['hod', 'safety_incharge','plant_head'].includes(user?.role || '');
+
+  if (!canSubmitClosure && !canApproveClosure) {
+    return (
+      <div className="text-center py-12">
+        <AlertTriangle className="mx-auto h-24 w-24 text-yellow-400" />
+        <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+          Not Authorized
+        </h3>
+        <p className="mt-2 text-gray-500 dark:text-gray-400">
+          You are not authorized to close this permit.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -159,14 +167,6 @@ const PermitClosure: React.FC = () => {
             >
               Excel
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handleExport('word')}
-              loading={isExporting}
-            >
-              Word
-            </Button>
           </div>
           <Button
             variant="secondary"
@@ -179,6 +179,7 @@ const PermitClosure: React.FC = () => {
               <Button
                 variant="danger"
                 onClick={() => handleApproval('reject')}
+                loading={isSubmitting}
               >
                 Reject Closure
               </Button>
@@ -186,6 +187,7 @@ const PermitClosure: React.FC = () => {
                 variant="success"
                 icon={CheckCircle}
                 onClick={() => handleApproval('approve')}
+                loading={isSubmitting}
               >
                 Approve Closure
               </Button>
@@ -194,7 +196,7 @@ const PermitClosure: React.FC = () => {
             <Button
               variant="primary"
               icon={Save}
-              loading={isLoading}
+              loading={isSubmitting}
               onClick={handleSubmit(onSubmit)}
             >
               Submit Closure
@@ -246,7 +248,7 @@ const PermitClosure: React.FC = () => {
                     {currentPermit.closure?.workCompleted ? (
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     ) : (
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                      <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <span className="text-sm text-gray-900 dark:text-white">
                       Work Completed
@@ -256,7 +258,7 @@ const PermitClosure: React.FC = () => {
                     {currentPermit.closure?.safetyChecklistCompleted ? (
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     ) : (
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                      <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <span className="text-sm text-gray-900 dark:text-white">
                       Safety Checklist Completed
@@ -266,7 +268,7 @@ const PermitClosure: React.FC = () => {
                     {currentPermit.closure?.equipmentReturned ? (
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     ) : (
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                      <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <span className="text-sm text-gray-900 dark:text-white">
                       Equipment Returned
@@ -276,13 +278,24 @@ const PermitClosure: React.FC = () => {
                     {currentPermit.closure?.areaCleared ? (
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     ) : (
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                      <XCircle className="h-5 w-5 text-red-500" />
                     )}
                     <span className="text-sm text-gray-900 dark:text-white">
                       Area Cleared
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Submitted By */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Submitted By
+                </label>
+                <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                  {currentPermit.closure?.submittedBy?.name} on {' '}
+                  {currentPermit.closure?.submittedAt && format(new Date(currentPermit.closure.submittedAt), 'MMM dd, yyyy HH:mm')}
+                </p>
               </div>
             </div>
           </Card>
@@ -395,6 +408,20 @@ const PermitClosure: React.FC = () => {
                 </select>
                 {errors.closureReason && (
                   <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.closureReason.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="actualEndTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Actual End Time *
+                </label>
+                <input
+                  {...register('actualEndTime', { required: 'Actual end time is required' })}
+                  type="datetime-local"
+                  className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                />
+                {errors.actualEndTime && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.actualEndTime.message}</p>
                 )}
               </div>
 

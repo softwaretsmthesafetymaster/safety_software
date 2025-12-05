@@ -149,7 +149,7 @@ router.patch('/:companyId/:id/review', authenticate, checkCompanyAccess, async (
   try {
     const { companyId, id } = req.params;
     const { status, rejectionReason } = req.body; // status: 'approved' or 'rejected'
-    console.log("req",req.body)
+    
     const updateData = {
       status,
       approvedBy: req.user._id,

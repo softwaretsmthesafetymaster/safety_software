@@ -96,7 +96,6 @@ const AuditChecklist: React.FC = () => {
       const response = await axios.post(`${API_URL}/checklist/${user?.companyId}/audit/${auditId}/initialize`,{
         templateId: selectedTemplateId
       });
-      
       const data = await response.data;
       if (data.audit) {
         setChecklist(data.audit.checklist);
@@ -518,8 +517,11 @@ const AuditChecklist: React.FC = () => {
                       <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                         <CheckCircle className="h-4 w-4" />
                         <span>
-                          Completed by {item?.completedBy?.name} on {format(new Date(item?.completedAt!), 'MMM dd, yyyy HH:mm')}
+                          {item?.completedAt
+                            ? `Completed by ${item?.completedBy?.name} on ${format(new Date(item.completedAt), 'MMM dd, yyyy HH:mm')}`
+                            : `Completed by ${item?.completedBy?.name}`}
                         </span>
+
                       </div>
                     </div>
                   )}

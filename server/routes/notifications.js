@@ -1,8 +1,10 @@
 import express from 'express';
 import Notification from '../models/Notification.js';
 import { authenticate, checkCompanyAccess } from '../middleware/auth.js';
+import { validatePagination, validateCompanyId, validate } from '../middleware/validation.js';
 import NotificationService from '../services/notificationService.js';
-import HAZOP from '../models/HAZOP.js';
+import logger from '../middleware/logger.js';
+import HAZOP from '../models/HAZOP.js'
 const router = express.Router();
 
 // Send notifications to team members for HAZOP
@@ -43,138 +45,264 @@ router.post('/send-team-notification', async (req, res) => {
 })
 
 
-// Get all notifications for a company
-router.get('/:companyId', authenticate, checkCompanyAccess, async (req, res) => {
-  try {
-    const { companyId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
+// Get all notifications for a user/company
+router.get('/:companyId', 
+  validateCompanyId,
+  validatePagination,
+  validate,
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      const { 
+        page = 1, 
+        limit = 20, 
+        unreadOnly, 
+        type, 
+        priority 
+      } = req.query;
 
-    const filter = { 
-      companyId,
-      $or: [
-        { userId: req.user._id },
-        { userId: { $exists: false } }
-      ]
-    };
+      const options = {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        unreadOnly: unreadOnly === 'true',
+        type,
+        priority
+      };
 
-    const notifications = await Notification.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      const result = await NotificationService.getUserNotifications(
+        req.user._id,
+        companyId,
+        options
+      );
 
-    const unreadCount = await Notification.countDocuments({
-      ...filter,
-      read: false
-    });
-
-    res.json({
-      notifications,
-      unreadCount,
-      total: await Notification.countDocuments(filter)
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+      res.json(result);
+    } catch (error) {
+      logger.error('Get notifications error', { 
+        error: error.message, 
+        userId: req.user._id,
+        companyId: req.params.companyId 
+      });
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
-});
+);
 
-// Create notification
-router.post('/', authenticate, async (req, res) => {
-  try {
-    const notificationData = {
-      ...req.body,
-      companyId: req.user.companyId
-    };
+// Create notification (admin only)
+router.post('/:companyId', 
+  validateCompanyId,
+  validate,
+  authenticate,
+  checkCompanyAccess,
+  async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      // Only certain roles can create notifications
+      // if (!['company_owner', 'plant_head', 'platform_owner'].includes(req.user.role)) {
+      //   return res.status(403).json({ message: 'Insufficient permissions' });
+      // }
 
-    const notification = new Notification(notificationData);
-    await notification.save();
+      const notificationData = {
+        ...req.body,
+        companyId
+      };
 
-    res.status(201).json({
-      message: 'Notification created successfully',
-      notification
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+      const notification = await NotificationService.createNotification(notificationData);
+
+      res.status(201).json({
+        message: 'Notification created successfully',
+        notification
+      });
+    } catch (error) {
+      logger.error('Create notification error', { 
+        error: error.message, 
+        companyId: req.params.companyId 
+      });
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
-});
+);
 
 // Mark notification as read
-router.patch('/:companyId/:id/read', authenticate, checkCompanyAccess, async (req, res) => {
-  try {
-    const { companyId, id } = req.params;
+router.patch('/:companyId/:id/read', 
+  validateCompanyId,
+  validate,
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
+    try {
+      const { companyId, id } = req.params;
 
-    const notification = await Notification.findOneAndUpdate(
-      { 
-        _id: id, 
-        companyId,
-        $or: [
-          { userId: req.user._id },
-          { userId: { $exists: false } }
-        ]
-      },
-      { read: true },
-      { new: true }
-    );
+      const notification = await NotificationService.markAsRead(id, req.user._id);
 
-    if (!notification) {
-      return res.status(404).json({ message: 'Notification not found' });
+      if (!notification) {
+        return res.status(404).json({ message: 'Notification not found' });
+      }
+
+      res.json({
+        message: 'Notification marked as read'
+      });
+    } catch (error) {
+      logger.error('Mark notification as read error', { 
+        error: error.message, 
+        notificationId: req.params.id 
+      });
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    res.json({
-      message: 'Notification marked as read',
-      notificationId: id
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
   }
-});
+);
 
 // Mark all notifications as read
-router.patch('/:companyId/read-all', authenticate, checkCompanyAccess, async (req, res) => {
-  try {
-    const { companyId } = req.params;
+router.patch('/:companyId/read-all', 
+  validateCompanyId,
+  validate,
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
+    try {
+      const { companyId } = req.params;
 
-    await Notification.updateMany(
-      { 
-        companyId,
-        $or: [
-          { userId: req.user._id },
-          { userId: { $exists: false } }
-        ],
-        read: false
-      },
-      { read: true }
-    );
+      const result = await NotificationService.markAllAsRead(req.user._id, companyId);
 
-    res.json({
-      message: 'All notifications marked as read'
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+      res.json({
+        message: 'All notifications marked as read',
+        modifiedCount: result.modifiedCount
+      });
+    } catch (error) {
+      logger.error('Mark all notifications as read error', { 
+        error: error.message, 
+        userId: req.user._id,
+        companyId: req.params.companyId 
+      });
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
-});
+);
 
 // Delete notification
-router.delete('/:companyId/:id', authenticate, checkCompanyAccess, async (req, res) => {
-  try {
-    const { companyId, id } = req.params;
+router.delete('/:companyId/:id', 
+  validateCompanyId,
+  validate,
+  authenticate, 
+  checkCompanyAccess, 
+  async (req, res) => {
+    try {
+      const { companyId, id } = req.params;
 
-    const notification = await Notification.findOneAndDelete({
-      _id: id,
-      companyId,
-      $or: [
-        { userId: req.user._id },
-        { userId: { $exists: false } }
-      ]
-    });
+      const notification = await Notification.findOneAndDelete({
+        _id: id,
+        $or: [
+          { userId: req.user._id, companyId },
+          { userId: { $exists: false }, companyId }
+        ]
+      });
 
-    if (!notification) {
-      return res.status(404).json({ message: 'Notification not found' });
+      if (!notification) {
+        return res.status(404).json({ message: 'Notification not found' });
+      }
+
+      res.json({ message: 'Notification deleted successfully' });
+    } catch (error) {
+      logger.error('Delete notification error', { 
+        error: error.message, 
+        notificationId: req.params.id 
+      });
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    res.json({ message: 'Notification deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
   }
-});
+);
+
+// Bulk operations for notifications
+router.post('/:companyId/bulk', 
+  validateCompanyId,
+  validate,
+  authenticate,
+  checkCompanyAccess,
+  async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      const { action, notificationIds, targetUsers, notificationData } = req.body;
+
+      // Only certain roles can perform bulk operations
+      if (!['company_owner', 'plant_head', 'platform_owner'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+
+      let result;
+
+      switch (action) {
+        case 'markAsRead':
+          if (!notificationIds || !Array.isArray(notificationIds)) {
+            return res.status(400).json({ message: 'notification IDs required' });
+          }
+          
+          result = await Notification.updateMany(
+            {
+              _id: { $in: notificationIds },
+              userId: req.user._id,
+              companyId
+            },
+            {
+              read: true,
+              readAt: new Date()
+            }
+          );
+          break;
+
+        case 'delete':
+          if (!notificationIds || !Array.isArray(notificationIds)) {
+            return res.status(400).json({ message: 'Notification IDs required' });
+          }
+          
+          result = await Notification.deleteMany({
+            _id: { $in: notificationIds },
+            userId: req.user._id,
+            companyId
+          });
+          break;
+
+        case 'sendToUsers':
+          if (!targetUsers || !notificationData) {
+            return res.status(400).json({ message: 'Target users and notification data required' });
+          }
+          
+          result = await NotificationService.notifyUsers(
+            targetUsers,
+            notificationData,
+            companyId
+          );
+          break;
+
+        case 'sendToRole':
+          if (!req.body.roles || !notificationData) {
+            return res.status(400).json({ message: 'Target roles and notification data required' });
+          }
+          
+          result = await NotificationService.notifyByRole(
+            companyId,
+            req.body.roles,
+            notificationData
+          );
+          break;
+
+        default:
+          return res.status(400).json({ message: 'Invalid bulk action' });
+      }
+
+      res.json({
+        message: 'Bulk operation completed successfully',
+        result
+      });
+    } catch (error) {
+      logger.error('Bulk notification operation error', { 
+        error: error.message, 
+        companyId: req.params.companyId 
+      });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
 
 export default router;

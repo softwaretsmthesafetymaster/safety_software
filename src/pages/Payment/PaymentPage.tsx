@@ -20,7 +20,6 @@ const PaymentPage: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
   const { isLoading } = useAppSelector((state) => state.payment);
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
-
   const modules = [
     {
       id: 'ptw',
@@ -134,14 +133,14 @@ const PaymentPage: React.FC = () => {
         currency: 'INR',
         modules: selectedModules
       })).unwrap();
-
+      console.log("or",order)
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
         name: 'SafetyPro',
         description: 'Safety Management Modules',
-        order_id: order.id,
+        order_id: order.orderId,
         handler: async function (response: any) {
           try {
             // Verify payment using Redux

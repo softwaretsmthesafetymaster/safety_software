@@ -1,21 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  Plus,
-  Search,
-  Filter,
-  Download,
-  Eye,
-  Edit,
-  MoreVertical,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Clock
-} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { Plus, Search, Filter, Download, Eye, CreditCard as Edit, CheckCircle, XCircle, Clock, FileText } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
 import { fetchPermits } from '../../store/slices/permitSlice';
+import { useExport } from '../../hooks/useExport';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
@@ -25,11 +15,14 @@ const PermitList: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { permits, isLoading, pagination } = useAppSelector((state) => state.permit);
+  const { exportList, isExporting } = useExport();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   useEffect(() => {
     if (user?.companyId) {
@@ -42,10 +35,12 @@ const PermitList: React.FC = () => {
       if (statusFilter) params.status = statusFilter;
       if (typeFilter) params.type = typeFilter;
       if (searchTerm) params.search = searchTerm;
+      if (dateRange.start) params.startDate = dateRange.start;
+      if (dateRange.end) params.endDate = dateRange.end;
       
       dispatch(fetchPermits(params));
     }
-  }, [dispatch, user?.companyId, currentPage, statusFilter, typeFilter, searchTerm]);
+  }, [dispatch, user?.companyId, currentPage, statusFilter, typeFilter, searchTerm, dateRange]);
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
@@ -62,6 +57,65 @@ const PermitList: React.FC = () => {
     setCurrentPage(1);
   };
 
+  const handleExportList = async () => {
+    try {
+      const filters = { status: statusFilter, type: typeFilter, search: searchTerm };
+      await exportList(permits, filters, 'excel');
+      toast.success('Permit list exported successfully');
+    } catch (error) {
+      toast.error('Failed to export permit list');
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setTypeFilter('');
+    setDateRange({ start: '', end: '' });
+    setCurrentPage(1);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active':
+      case 'approved':
+        return CheckCircle;
+      case 'expired':
+      case 'rejected':
+        return XCircle;
+      case 'submitted':
+      case 'pending':
+        return Clock;
+      default:
+        return FileText;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'approved':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'submitted':
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'expired':
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'stopped':
+        return 'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      case 'pending_closure':
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+      case 'closed':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    }
+  };
+
   if (isLoading && permits.length === 0) {
     return <LoadingSpinner className="min-h-screen" />;
   }
@@ -69,7 +123,7 @@ const PermitList: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Permits
@@ -79,8 +133,13 @@ const PermitList: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="secondary" icon={Download}>
-            Export
+          <Button 
+            variant="secondary" 
+            icon={Download}
+            onClick={handleExportList}
+            loading={isExporting}
+          >
+            Export List
           </Button>
           <Link to="/ptw/permits/new">
             <Button variant="primary" icon={Plus}>
@@ -88,62 +147,114 @@ const PermitList: React.FC = () => {
             </Button>
           </Link>
         </div>
-
       </div>
 
       {/* Filters */}
       <Card className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search permits..."
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10 w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search permits..."
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-10 w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => handleStatusFilter(e.target.value)}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="">All Status</option>
+              <option value="draft">Draft</option>
+              <option value="submitted">Submitted</option>
+              <option value="approved">Approved</option>
+              <option value="active">Active</option>
+              <option value="expired">Expired</option>
+              <option value="closed">Closed</option>
+              <option value="stopped">Stopped</option>
+              <option value="pending_closure">Pending Closure</option>
+            </select>
+
+            {/* Type Filter */}
+            <select
+              value={typeFilter}
+              onChange={(e) => handleTypeFilter(e.target.value)}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="">All Types</option>
+              <option value="hot_work">Hot Work</option>
+              <option value="cold_work">Cold Work</option>
+              <option value="electrical">Electrical</option>
+              <option value="working_at_height">Working at Height</option>
+              <option value="confined_space">Confined Space</option>
+              <option value="excavation">Excavation</option>
+              <option value="lifting">Lifting Operations</option>
+              <option value="fire">Fire Work</option>
+              <option value="environmental">Environmental</option>
+              <option value="demolition">Demolition</option>
+              <option value="chemical">Chemical Work</option>
+              <option value="radiation">Radiation Work</option>
+            </select>
+
+            {/* Advanced Filter Toggle */}
+            <Button
+              variant="secondary"
+              icon={Filter}
+              className="justify-center"
+              onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+            >
+              {showAdvancedFilter ? 'Hide' : 'Advanced'} Filter
+            </Button>
           </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => handleStatusFilter(e.target.value)}
-            className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-          >
-            <option value="">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="active">Active</option>
-            <option value="expired">Expired</option>
-            <option value="closed">Closed</option>
-          </select>
-
-          {/* Type Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => handleTypeFilter(e.target.value)}
-            className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-          >
-            <option value="">All Types</option>
-            <option value="hot_work">Hot Work</option>
-            <option value="cold_work">Cold Work</option>
-            <option value="electrical">Electrical</option>
-            <option value="working_at_height">Working at Height</option>
-            <option value="confined_space">Confined Space</option>
-            <option value="excavation">Excavation</option>
-          </select>
-
-          {/* Advanced Filter */}
-          <Button
-            variant="secondary"
-            icon={Filter}
-            className="justify-center"
-          >
-            Advanced Filter
-          </Button>
+          {/* Advanced Filters */}
+          {showAdvancedFilter && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Start Date From
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Start Date To
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="secondary"
+                  onClick={clearFilters}
+                  className="w-full"
+                >
+                  Clear All Filters
+                </Button>
+              </div>
+            </motion.div>
+          )}
         </div>
       </Card>
 
@@ -174,135 +285,111 @@ const PermitList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {permits.map((permit, index) => (
-                <motion.tr
-                  key={permit._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col">
-                      <Link
-                        to={`/ptw/permits/${permit._id}`}
-                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        {permit.permitNumber}
-                      </Link>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {permit.plantId?.name}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 dark:text-white max-w-xs">
-                      <p className="truncate">{permit.workDescription}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {permit.types?.map((type, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded"
-                          >
-                            {type.replace('_', ' ')}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      permit.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                      permit.status === 'approved' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                      permit.status === 'submitted' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      permit.status === 'expired' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                      permit.status === 'stopped' ? 'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                      permit.status === 'draft' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' :
-                      permit.status === 'pending_closure' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' :
-                      permit.status === 'closed' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' :
-                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                    }`}>
-                      {permit.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      <div>Start: {format(new Date(permit.schedule?.startDate), 'MMM dd, yyyy')}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        End: {format(new Date(permit.schedule?.endDate), 'MMM dd, yyyy')}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {permit.requestedBy?.name}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {permit.requestedBy?.email}
-                    </div>
-                  </td>
-                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div 
-                  className="flex items-center space-x-2"
+              {permits.map((permit, index) => {
+                const StatusIcon = getStatusIcon(permit.status);
+                return (
+                  <motion.tr
+                    key={permit._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
-                    {/* View Permit */}
-                    <Link to={`/ptw/permits/${permit._id}`}>
-                      <Button size="sm" variant="secondary" icon={Eye} children="View" />
-                    </Link>
-
-                    {/* Submitted → Approvals */}
-                    {/* {permit.status === "submitted" && (() => {
-                      const nextApproval = permit.approvals.find((a) => a.status === "pending");
-                      if (nextApproval && nextApproval.role === user?.role) {
-                        return (
-                          <Link to={`/ptw/permits/${permit._id}/approve`}>
-                            <Button size="sm" variant="primary" icon={CheckCircle}>
-                              Approve ({nextApproval.label})
-                            </Button>
-                          </Link>
-                        );
-                      }
-                      return null;
-                    })()} */}
-
-                    {/* Active → Close (worker) */}
-                    {/* {permit.status === "active" && user?.role === "worker" && (
-                      <Link to={`/ptw/permits/${permit._id}/close`}>
-                        <Button size="sm" variant="success" icon={CheckCircle}>
-                          Close
-                        </Button>
-                      </Link>
-                    )} */}
-
-                    {/* Active → Stop Work (hod, safety_incharge, plant_head) */}
-                    {/* {permit.status === "active" &&
-                      permit.stopWorkRoles?.some((r) => r.role === user?.role) && (
-                        <Link to={`/ptw/permits/${permit._id}/stop`}>
-                          <Button size="sm" variant="danger" icon={XCircle}>
-                            Emergency Stop
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <Link
+                          to={`/ptw/permits/${permit._id}`}
+                          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {permit.permitNumber}
+                        </Link>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {permit.plantId?.name || 'N/A'}
+                        </div>
+                        {permit.isHighRisk && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 mt-1 w-fit">
+                            High Risk
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 dark:text-white max-w-xs">
+                        <p className="line-clamp-2">{permit.workDescription}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {permit.types?.slice(0, 2).map((type, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded"
+                            >
+                              {type.replace('_', ' ')}
+                            </span>
+                          ))}
+                          {permit.types && permit.types.length > 2 && (
+                            <span className="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
+                              +{permit.types.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <StatusIcon className={`h-4 w-4 ${
+                          permit.status === 'active' ? 'text-green-500' :
+                          permit.status === 'expired' || permit.status === 'rejected' ? 'text-red-500' :
+                          permit.status === 'submitted' || permit.status === 'pending' ? 'text-yellow-500' :
+                          'text-gray-500'
+                        }`} />
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(permit.status)}`}>
+                          {permit.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        <div>Start: {format(new Date(permit.schedule?.startDate), 'MMM dd, HH:mm')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          End: {format(new Date(permit.schedule?.endDate), 'MMM dd, HH:mm')}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {permit.requestedBy?.name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {permit.requestedBy?.role}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <Link to={`/ptw/permits/${permit._id}`}>
+                          <Button size="sm" variant="secondary" icon={Eye}>
+                            View
                           </Button>
                         </Link>
-                      )} */}
 
-                    {/* Pending Closure → Approve Closure */}
-                    {/* {permit.status === "pending_closure" && (() => {
-                      const nextClosure = permit.closureFlow.find((c) => c.status === "pending");
-                      if (nextClosure && nextClosure.role === user?.role) {
-                        return (
-                          <Link to={`/ptw/permits/${permit._id}/close`}>
-                            <Button size="sm" variant="success" icon={CheckCircle}>
-                              Approve Closure ({nextClosure.label})
+                        {permit.status === "draft" && String(permit.requestedBy._id) === String(user?._id) && (
+                          <Link to={`/ptw/permits/${permit._id}/edit`}>
+                            <Button size="sm" variant="primary" icon={Edit}>
+                              Edit
                             </Button>
                           </Link>
-                        );
-                      }
-                      return null;
-                    })()} */}
-                  </div>
-                </td>
+                        )}
 
-                </motion.tr>
-              ))}
+                        {permit.status === "approved" && String(permit.requestedBy._id) === String(user?._id) && (
+                          <Link to={`/ptw/permits/${permit._id}/activate`}>
+                            <Button size="sm" variant="success" icon={CheckCircle}>
+                              Activate
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </td>
+                  </motion.tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -351,7 +438,13 @@ const PermitList: React.FC = () => {
                   >
                     Previous
                   </button>
-                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      const start = Math.max(1, currentPage - 2);
+                      const end = Math.min(pagination.totalPages, currentPage + 2);
+                      return page >= start && page <= end;
+                    })
+                    .map((page) => (
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
@@ -385,13 +478,16 @@ const PermitList: React.FC = () => {
           className="text-center py-12"
         >
           <div className="mx-auto h-24 w-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-            <Plus className="h-12 w-12 text-gray-400" />
+            <FileText className="h-12 w-12 text-gray-400" />
           </div>
           <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
             No permits found
           </h3>
           <p className="mt-2 text-gray-500 dark:text-gray-400">
-            Get started by creating your first permit.
+            {searchTerm || statusFilter || typeFilter 
+              ? 'Try adjusting your filters to see more results.'
+              : 'Get started by creating your first permit.'
+            }
           </p>
           <div className="mt-6">
             <Link to="/ptw/permits/new">
@@ -400,7 +496,6 @@ const PermitList: React.FC = () => {
               </Button>
             </Link>
           </div>
-
         </motion.div>
       )}
     </div>

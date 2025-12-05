@@ -74,7 +74,6 @@ router.patch('/:companyId/audit/:auditId', authenticate, checkCompanyAccess, asy
   try {
     const { companyId, auditId } = req.params;
     const { checklist } = req.body;
-
     const audit = await Audit.findOne({ _id: auditId, companyId });
     if (!audit) {
       return res.status(404).json({ message: 'Audit not found' });
@@ -107,24 +106,22 @@ router.patch('/:companyId/audit/:auditId', authenticate, checkCompanyAccess, asy
 router.post('/:companyId/audit/:auditId/initialize', authenticate, checkCompanyAccess, async (req, res) => {
   try {
     const { companyId, auditId } = req.params;
-   console.log("req.body", req.body);
     const { templateId } = req.body;
+
     const [audit, template] = await Promise.all([
-      Audit.findOne({ _id: auditId, companyId }),
-      ChecklistTemplate.findOne({ _id: templateId.toString(), companyId })
+      Audit.findOne({ _id: auditId, companyId }).lean(),
+      ChecklistTemplate.findOne({ _id: templateId.toString(), companyId }).lean()
     ]);
 
     if (!audit || !template) {
       return res.status(404).json({ message: 'Audit or template not found' });
     }
 
-    // Initialize checklist from template
-    audit.checklistTemplateId = templateId;
-    audit.checklist = [];
-
+    // Build fresh checklist items
+    const checklistItems = [];
     template.categories.forEach(category => {
       category.questions.forEach(question => {
-        audit.checklist.push({
+        checklistItems.push({
           categoryId: category._id?.toString() || category.name,
           categoryName: category.name,
           questionId: question.id,
@@ -138,19 +135,28 @@ router.post('/:companyId/audit/:auditId/initialize', authenticate, checkCompanyA
       });
     });
 
-    await audit.save();
+    // Atomic update — no version conflicts
+    const updatedAudit = await Audit.findByIdAndUpdate(
+      auditId,
+      {
+        $set: {
+          checklistTemplateId: templateId,
+          checklist: checklistItems
+        }
+      },
+      { new: true }
+    );
 
     res.json({
-      message: 'Checklist initialized successfully',
-      audit: {
-        _id: audit._id,
-        checklist: audit.checklist,
-        checklistTemplate: template
-      }
+      message: "Checklist initialized successfully",
+      audit: updatedAudit,
+      checklistTemplate: template
     });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 export default router;

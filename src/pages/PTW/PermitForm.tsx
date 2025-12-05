@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { SignatureCanvas } from '../../components/DigitalSignature/SignatureCanvas';
 import { motion } from 'framer-motion';
 import { useForm, useFieldArray } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
 import {
   Save,
   Send,
@@ -18,13 +19,21 @@ import {
   FileText
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks/redux';
-import { createPermit, updatePermit, fetchPermitById, submitPermit } from '../../store/slices/permitSlice';
+import { 
+  createPermit, 
+  updatePermit, 
+  fetchPermitById, 
+  submitPermit,
+  fetchPermitChecklist,
+  updateChecklistsForPermit
+} from '../../store/slices/permitSlice';
+import { getArea } from '../../store/slices/plantSlice';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
-import { addNotification } from '../../store/slices/uiSlice';
 import axios from 'axios';
-import { getArea } from '../../store/slices/plantSlice';
+
 const API_URL = import.meta.env.VITE_API_URL;
+
 interface PermitFormData {
   types: string[];
   workDescription: string;
@@ -62,8 +71,10 @@ interface PermitFormData {
     item: string;
     checked: boolean;
     remarks: string;
+    category: string;
   }>;
   signatures: Array<{
+    user: Object;
     role: string;
     signature: string;
   }>;
@@ -76,13 +87,10 @@ const PermitForm: React.FC = () => {
   const isEdit = !!id;
   
   const { user } = useAppSelector((state) => state.auth);
-  const { currentPermit, isLoading } = useAppSelector((state) => state.permit);
-  const { plants } = useAppSelector((state) => state.plant);
-  const { areas } = useAppSelector((state) => state.plant);
+  const { currentPermit, isLoading, checklists } = useAppSelector((state) => state.permit);
+  const { plants, areas } = useAppSelector((state) => state.plant);
   
-  const { currentCompany } = useAppSelector((state) => state.company);
   const [selectedPlant, setSelectedPlant] = useState<any>(null);
-  const [selectedArea, setSelectedArea] = useState<any>(null);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [signatureData, setSignatureData] = useState<string>('');
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
@@ -101,8 +109,7 @@ const PermitForm: React.FC = () => {
       ],
       safetyChecklist: [],
       signatures: [
-        { role: 'Permit Holder', signature: '' },
-        { role: 'Area In-charge', signature: '' },
+        { user: null,  role: 'Permit Holder', signature: '' },
       ]
     }
   });
@@ -121,30 +128,32 @@ const PermitForm: React.FC = () => {
   const watchTypes = watch('types');
 
   const handleSignatureSave = async (signature: string) => {
- 
     const signatureUrl = await uploadSignature(signature);
- 
-    setSignatureData(signatureUrl)
-
+    setSignatureData(signatureUrl);
+    setSignatureImage(signatureUrl)
     setValue('signatures', [
-      { role: 'Permit Holder', signature: signatureUrl },
+      { user: user?._id, role: 'Permit Holder', signature: signatureUrl },
     ]);
     setIsSignatureModalOpen(false);
-    setSignatureImage(signatureUrl);
+    toast.success('Signature saved successfully');
   };
+
   const uploadSignature = async (signature: string) => {
     try {
       const formData = new FormData();
       formData.append('files', signature);
+      
       const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data.urls[0];
     } catch (error) {
       console.error('Error uploading signature:', error);
-      return null;
+      toast.error('Failed to upload signature');
+      return signature; // Return original if upload fails
     }
   };
+
   const handleSignatureCancel = () => {
     setIsSignatureModalOpen(false);
   };
@@ -153,21 +162,128 @@ const PermitForm: React.FC = () => {
     if (watchPlantId) {
       const plant = plants.find(p => p._id === watchPlantId);
       setSelectedPlant(plant);
+      if (user?.companyId) {
+        dispatch(getArea({ companyId: user.companyId, plantId: watchPlantId }));
+      }
     }
-  }, [watchPlantId, plants]);
-  
-  useEffect(() => {
-    if (watchPlantId) {
-      dispatch(getArea({ companyId: user.companyId, plantId: watchPlantId }));
-    }
-  }, [dispatch, user.companyId, watchPlantId]);
+  }, [watchPlantId, plants, dispatch, user?.companyId]);
 
   useEffect(() => {
     if (watchTypes && watchTypes.length > 0) {
       setSelectedTypes(watchTypes);
-      updateChecklistBasedOnTypes(watchTypes);
+      loadChecklistsForTypes(watchTypes);
     }
-  }, [watchTypes]);
+  }, [watchTypes, dispatch]);
+
+  const loadChecklistsForTypes = async (types: string[]) => {
+    try {
+      const checklistPromises = types.map(type => {
+        // Map frontend permit types to backend permit types
+        const mappedType = mapPermitType(type);
+        return dispatch(fetchPermitChecklist(mappedType));
+      });
+      
+      await Promise.all(checklistPromises);
+      
+      // After fetching all checklists, update the current permit
+      dispatch(updateChecklistsForPermit({ 
+        permitTypes: types.map(mapPermitType), 
+        checklists 
+      }));
+      
+      updateSafetyChecklistFromTypes(types);
+    } catch (error) {
+      console.error('Error loading checklists:', error);
+      toast.error('Failed to load safety checklists');
+    }
+  };
+
+  const mapPermitType = (frontendType: string) => {
+    const mapping: { [key: string]: string } = {
+      'hot_work': 'hotWork',
+      'cold_work': 'coldWork',
+      'electrical': 'electrical',
+      'working_at_height': 'workAtHeight',
+      'confined_space': 'confinedSpace',
+      'excavation': 'excavation',
+      'lifting': 'lifting',
+      'fire': 'fire',
+      'environmental': 'environmental',
+      'demolition': 'demolition',
+      'chemical': 'chemical',
+      'radiation': 'radiation'
+    };
+    return mapping[frontendType] || frontendType;
+  };
+
+  const updateSafetyChecklistFromTypes = (types: string[]) => {
+    const combinedChecklist: Array<{ item: string; checked: boolean; remarks: string; category: string }> = [];
+    
+    types.forEach(type => {
+      const mappedType = mapPermitType(type);
+      const typeChecklist = checklists[mappedType];
+      
+      if (typeChecklist) {
+        // Add risk associated items
+        typeChecklist.riskAssociated?.forEach((item: string) => {
+          if (!combinedChecklist.find(c => c.item === item)) {
+            combinedChecklist.push({ 
+              item, 
+              checked: false, 
+              remarks: '', 
+              category: 'risk' 
+            });
+          }
+        });
+
+        // Add precautions
+        typeChecklist.precautions?.forEach((item: string) => {
+          if (!combinedChecklist.find(c => c.item === item)) {
+            combinedChecklist.push({ 
+              item, 
+              checked: false, 
+              remarks: '', 
+              category: 'precaution' 
+            });
+          }
+        });
+
+        // Add PPE items to main PPE list
+        typeChecklist.ppeRequired?.forEach((item: string) => {
+          const currentPPE = watch('ppe') || [];
+          if (!currentPPE.find(p => p.item === item)) {
+            setValue('ppe', [...currentPPE, { item, required: true }]);
+          }
+        });
+
+        // Add inspection checklist
+        typeChecklist.inspectionChecklist?.forEach((item: string) => {
+          if (!combinedChecklist.find(c => c.item === item)) {
+            combinedChecklist.push({ 
+              item, 
+              checked: false, 
+              remarks: '', 
+              category: 'inspection' 
+            });
+          }
+        });
+
+        // Add rescue techniques
+        typeChecklist.rescueTechniques?.forEach((item: string) => {
+          if (!combinedChecklist.find(c => c.item === item)) {
+            combinedChecklist.push({ 
+              item, 
+              checked: false, 
+              remarks: '', 
+              category: 'rescue' 
+            });
+          }
+        });
+      }
+    });
+    
+    setValue('safetyChecklist', combinedChecklist);
+  };
 
   useEffect(() => {
     if (isEdit && id && user?.companyId) {
@@ -182,37 +298,28 @@ const PermitForm: React.FC = () => {
       setValue('location', currentPermit.location || { area: '', specificLocation: '' });
       setValue('contractor', currentPermit.contractor || { name: '', contact: '', license: '' });
       setValue('schedule', {
-        startDate: currentPermit.schedule?.startDate ? new Date(currentPermit.schedule.startDate).toISOString().split('T')[0] : '',
-        endDate: currentPermit.schedule?.endDate ? new Date(currentPermit.schedule.endDate).toISOString().split('T')[0] : '',
+        startDate: currentPermit.schedule?.startDate ? new Date(currentPermit.schedule.startDate).toISOString().slice(0, 16) : '',
+        endDate: currentPermit.schedule?.endDate ? new Date(currentPermit.schedule.endDate).toISOString().slice(0, 16) : '',
         shift: currentPermit.schedule?.shift || ''
       });
       setValue('plantId', currentPermit.plantId?._id || '');
       setValue('areaId', currentPermit.areaId || '');
+      setValue('workers', currentPermit.workers || []);
+      setValue('hazards', currentPermit.hazards || []);
+      setValue('ppe', currentPermit.ppe || []);
+      setValue('safetyChecklist', currentPermit.safetyChecklist || []);
+      
+      if (currentPermit.signatures && currentPermit.signatures.length > 0) {
+        setSignatureImage(currentPermit.signatures[0].signature);
+      }
     }
   }, [currentPermit, isEdit, setValue]);
 
-  const updateChecklistBasedOnTypes = (types: string[]) => {
-    const ptwConfig = currentCompany?.config?.modules?.ptw;
-    const checklists = ptwConfig?.checklists || {};
-    
-    let combinedChecklist: Array<{ item: string; checked: boolean; remarks: string }> = [];
-    
-    types.forEach(type => {
-      const typeKey = type.replace('_', '');
-      const typeChecklist = checklists[typeKey] || [];
-      
-      typeChecklist.forEach((item: string) => {
-        if (!combinedChecklist.find(c => c.item === item)) {
-          combinedChecklist.push({ item, checked: false, remarks: '' });
-        }
-      });
-    });
-    
-    setValue('safetyChecklist', combinedChecklist);
-  };
-
   const onSubmit = async (data: PermitFormData, isDraft = true) => {
-    if (!user?.companyId) return;
+    if (!user?.companyId) {
+      toast.error('User company information is missing');
+      return;
+    }
     
     try {
       const permitData = {
@@ -226,10 +333,7 @@ const PermitForm: React.FC = () => {
           id,
           data: permitData
         })).unwrap();
-        dispatch(addNotification({
-          type: 'success',
-          message: 'Permit updated successfully'
-        }));
+        toast.success('Permit updated successfully');
       } else {
         const result = await dispatch(createPermit({
           companyId: user.companyId,
@@ -243,17 +347,11 @@ const PermitForm: React.FC = () => {
           })).unwrap();
         }
         
-        dispatch(addNotification({
-          type: 'success',
-          message: isDraft ? 'Permit saved as draft' : 'Permit submitted for approval'
-        }));
+        toast.success(isDraft ? 'Permit saved as draft' : 'Permit submitted for approval');
       }
       navigate('/ptw/permits');
     } catch (error: any) {
-      dispatch(addNotification({
-        type: 'error',
-        message: error.message || 'Failed to save permit'
-      }));
+      toast.error(error.message || 'Failed to save permit');
     }
   };
 
@@ -264,8 +362,14 @@ const PermitForm: React.FC = () => {
     { value: 'working_at_height', label: 'Working at Height' },
     { value: 'confined_space', label: 'Confined Space' },
     { value: 'excavation', label: 'Excavation' },
+    { value: 'lifting', label: 'Lifting Operations' },
+    { value: 'fire', label: 'Fire Work' },
+    { value: 'environmental', label: 'Environmental' },
+    { value: 'demolition', label: 'Demolition' },
+    { value: 'chemical', label: 'Chemical Work' },
+    { value: 'radiation', label: 'Radiation Work' },
   ];
-
+  const disabledInputClass = "w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm bg-gray-100 dark:bg-gray-800 dark:text-white cursor-not-allowed focus:ring-0 focus:border-gray-300 py-2 px-3";
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -297,6 +401,7 @@ const PermitForm: React.FC = () => {
             <Button
               variant="success"
               icon={Send}
+              loading={isLoading}
               onClick={handleSubmit((data) => onSubmit(data, false))}
             >
               Submit for Approval
@@ -318,9 +423,9 @@ const PermitForm: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
               Permit Types *
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {permitTypes.map((type) => (
-                <label key={type.value} className="flex items-center space-x-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                <label key={type.value} className="flex items-center space-x-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <input
                     type="checkbox"
                     {...register('types', { required: 'At least one permit type is required' })}
@@ -360,17 +465,17 @@ const PermitForm: React.FC = () => {
               <label htmlFor="plantId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Plant *
               </label>
-              <select
-                {...register('plantId', { required: 'Plant is required' })}
-                className="mt-1 block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="">Select Plant</option>
-                {plants.map((plant) => (
-                  <option key={plant._id} value={plant._id}>
-                    {plant.name} ({plant.code})
-                  </option>
-                ))}
-              </select>
+              <input
+                    type="text"
+                    value={user?.plantId?.name ? `${user.plantId.name} (${user.plantId.code})` : ''}
+                    readOnly
+                    className={disabledInputClass}
+                  />
+              <input
+                    {...register('plantId')}
+                    type="hidden"
+                    value={user?.plantId?._id || ''}
+                  />
               {errors.plantId && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.plantId.message}</p>
               )}
@@ -699,7 +804,7 @@ const PermitForm: React.FC = () => {
                       <input
                         {...register(`ppe.${index}.item` as const)}
                         type="text"
-                        className="border-0 bg-transparent p-0 focus:ring-0 text-sm font-medium"
+                        className="border-0 bg-transparent p-0 focus:ring-0 text-sm font-medium dark:text-white"
                         placeholder="PPE item"
                       />
                     </label>
@@ -712,67 +817,85 @@ const PermitForm: React.FC = () => {
 
         {/* Safety Checklist */}
         {watch('safetyChecklist')?.length > 0 && (
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
-              <CheckSquare className="h-5 w-5 mr-2" />
-              Safety Checklist
-            </h2>
-            <div className="space-y-4">
-              {watch('safetyChecklist')?.map((_, index) => (
-                <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <div className="flex items-start space-x-3">
-                    <input
-                      {...register(`safetyChecklist.${index}.checked` as const)}
-                      type="checkbox"
-                      className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <div className="flex-1">
-                      <input
-                        {...register(`safetyChecklist.${index}.item` as const)}
-                        type="text"
-                        className="block w-full border-0 bg-transparent p-0 focus:ring-0 text-sm font-medium text-gray-900 dark:text-white"
-                        placeholder="Checklist item"
-                        readOnly
-                      />
-                      <textarea
-                        {...register(`safetyChecklist.${index}.remarks` as const)}
-                        rows={2}
-                        className="mt-2 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-white text-sm"
-                        placeholder="Remarks or additional notes (optional)"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+  <Card className="p-6">
+    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
+      <CheckSquare className="h-5 w-5 mr-2" />
+      Safety Checklist
+    </h2>
+
+    <div className="space-y-4">
+      {watch('safetyChecklist')?.map((item, index) => {
+        const checked = watch(`safetyChecklist.${index}.checked`);
+        return (
+          <div 
+            key={index} 
+            className={`p-4 border rounded-lg transition 
+              ${checked ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+          >
+            <label className="flex items-start space-x-3 cursor-pointer">
+              <input
+                {...register(`safetyChecklist.${index}.checked` as const)}
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+
+              <p className="text-sm text-gray-900 dark:text-gray-300 font-medium">
+                {item.item}
+              </p>
+            </label>
+
+            {checked && (
+              <textarea
+                {...register(`safetyChecklist.${index}.remarks` as const)}
+                rows={2}
+                className="mt-3 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-green-500 focus:ring-green-500 dark:bg-gray-800 dark:text-white text-sm"
+                placeholder="Add remarks (optional)"
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </Card>
+)}
+
 
         {/* Digital Signatures */}
         <Card className="p-6">
-         <div className="flex items-center justify-between">
-         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
+         <div className="flex items-center justify-between mb-4">
+         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
             <PenTool className="h-5 w-5 mr-2" />
             Digital Signatures
           </h2>
 
         <Button
+          type="button"
           variant="primary"
           icon={PenTool}
           onClick={() => setIsSignatureModalOpen(true)}
         >
-          Sign
+          {signatureImage ? 'Update Signature' : 'Sign'}
         </Button>
          </div>
+         
         <SignatureCanvas
           isOpen={isSignatureModalOpen}
           onSave={handleSignatureSave}
           onCancel={handleSignatureCancel}
           signerName={user?.name || 'Unknown'}
           signerRole={user?.role || 'Unknown'}
-          
         />
-        {signatureImage && <img src={signatureImage} alt="Signature" />}
+        
+        {signatureImage && (
+          <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Signature:</p>
+            <img 
+              src={signatureImage} 
+              alt="Digital Signature" 
+              className="max-h-20 border border-gray-300 dark:border-gray-600 rounded"
+            />
+          </div>
+        )}
       </Card>
       </form>
     </div>

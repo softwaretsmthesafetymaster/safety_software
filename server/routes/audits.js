@@ -314,4 +314,445 @@ function getContentType(format) {
   }
 }
 
+// Area (Department) compliance analytics
+router.get('/:companyId/analytics/department-compliance', authenticate, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { dateFrom, dateTo, status, standard, type } = req.query;
+
+    const matchStage = { companyId: new mongoose.Types.ObjectId(companyId) };
+
+    if (dateFrom && dateTo) {
+      matchStage.scheduledDate = { $gte: new Date(dateFrom), $lte: new Date(dateTo) };
+    }
+    if (status) matchStage.status = status;
+    if (standard) matchStage.standard = standard;
+    if (type) matchStage.type = type;
+
+    const departmentCompliance = await Audit.aggregate([
+      { $match: matchStage },
+
+      // AREA Lookup
+      {
+        $lookup: {
+          from: "areas",
+          localField: "areaId",
+          foreignField: "_id",
+          as: "area"
+        }
+      },
+      { $unwind: "$area" },
+
+      {
+        $group: {
+          _id: {
+            areaId: "$areaId",
+            areaName: "$area.name"
+          },
+          totalAudits: { $sum: 1 },
+          totalQuestions: { $sum: "$summary.totalQuestions" },
+          answeredQuestions: { $sum: "$summary.answered" },
+          yesAnswers: { $sum: "$summary.yesAnswers" },
+          noAnswers: { $sum: "$summary.noAnswers" },
+          naAnswers: { $sum: "$summary.naAnswers" },
+          avgCompliance: { $avg: "$summary.compliancePercentage" }
+        }
+      },
+
+      {
+        $project: {
+          areaId: "$_id.areaId",
+          department: "$_id.areaName",
+          total: "$noAnswers",
+          major: "$noAnswers",
+          minor: { $literal: 0 },
+          compliance: { $round: ["$avgCompliance", 0] },
+          totalQuestions: "$totalQuestions",
+          answeredQuestions: "$answeredQuestions"
+        }
+      },
+
+      { $sort: { compliance: -1 } }
+    ]);
+
+    res.json(departmentCompliance);
+
+  } catch (error) {
+    console.error("Area compliance error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+
+// Clause compliance analytics
+router.get('/:companyId/analytics/clause-compliance', authenticate, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { dateFrom, dateTo, status, standard, type } = req.query;
+
+    const matchStage = { companyId: new mongoose.Types.ObjectId(companyId) };
+
+    if (dateFrom && dateTo) {
+      matchStage.scheduledDate = { $gte: new Date(dateFrom), $lte: new Date(dateTo) };
+    }
+    if (status) matchStage.status = status;
+    if (standard) matchStage.standard = standard;
+    if (type) matchStage.type = type;
+
+    const clauseCompliance = await Audit.aggregate([
+      { $match: matchStage },
+      { $unwind: "$checklist" },
+
+      {
+        $group: {
+          _id: "$checklist.clause",
+          totalQuestions: { $sum: 1 },
+          yesAnswers: { $sum: { $cond: [{ $eq: ["$checklist.answer", "yes"] }, 1, 0] } },
+          noAnswers: { $sum: { $cond: [{ $eq: ["$checklist.answer", "no"] }, 1, 0] } },
+          naAnswers: { $sum: { $cond: [{ $eq: ["$checklist.answer", "na"] }, 1, 0] } },
+        }
+      },
+
+      {
+        $project: {
+          clause: "$_id",
+          total: "$noAnswers",
+          major: "$noAnswers",
+          minor: { $literal: 0 },
+
+          compliance: {
+            $round: [
+              {
+                $multiply: [
+                  { $divide: [{ $add: ["$yesAnswers", "$naAnswers"] }, "$totalQuestions"] },
+                  100
+                ]
+              },
+              0
+            ]
+          }
+        }
+      },
+
+      { $match: { clause: { $ne: null } } },
+      { $sort: { total: -1 } }
+    ]);
+
+    res.json(clauseCompliance);
+
+  } catch (error) {
+    console.error("Clause compliance error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+
+// Monthly trends analytics
+router.get('/:companyId/analytics/monthly-trends', authenticate, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { dateFrom, dateTo, status, standard, type } = req.query;
+
+    const matchStage = { companyId: new mongoose.Types.ObjectId(companyId) };
+    
+    if (dateFrom && dateTo) {
+      matchStage.scheduledDate = {
+        $gte: new Date(dateFrom),
+        $lte: new Date(dateTo)
+      };
+    }
+    if (status) matchStage.status = status;
+    if (standard) matchStage.standard = standard;
+    if (type) matchStage.type = type;
+
+    const monthlyTrends = await Audit.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$scheduledDate' },
+            month: { $month: '$scheduledDate' }
+          },
+          audits: { $sum: 1 },
+          totalObservations: { $sum: { $size: { $ifNull: ['$observations', []] } } },
+          avgCompliance: { $avg: '$summary.compliancePercentage' },
+          totalQuestions: { $sum: '$summary.totalQuestions' },
+          answeredQuestions: { $sum: '$summary.answered' },
+          noAnswers: { $sum: '$summary.noAnswers' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'observations',
+          let: { 
+            year: '$_id.year', 
+            month: '$_id.month',
+            companyId: new mongoose.Types.ObjectId(companyId)
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$companyId', '$$companyId'] },
+                    { $eq: [{ $year: '$createdAt' }, '$$year'] },
+                    { $eq: [{ $month: '$createdAt' }, '$$month'] }
+                  ]
+                }
+              }
+            },
+            {
+              $group: {
+                _id: '$severity',
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          as: 'observationsBySeverity'
+        }
+      },
+      {
+        $project: {
+          month: {
+            $arrayElemAt: [
+              ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+              '$_id.month'
+            ]
+          },
+          year: '$_id.year',
+          observations: '$totalObservations',
+          compliance: { $round: ['$avgCompliance', 0] },
+          audits: '$audits',
+          majorFindings: {
+            $reduce: {
+              input: '$observationsBySeverity',
+              initialValue: 0,
+              in: {
+                $cond: [
+                  { $eq: ['$$this._id', 'major'] },
+                  '$$this.count',
+                  '$$value'
+                ]
+              }
+            }
+          },
+          minorFindings: {
+            $reduce: {
+              input: '$observationsBySeverity',
+              initialValue: 0,
+              in: {
+                $cond: [
+                  { $eq: ['$$this._id', 'minor'] },
+                  '$$this.count',
+                  '$$value'
+                ]
+              }
+            }
+          },
+          totalQuestions: '$totalQuestions',
+          answeredQuestions: '$answeredQuestions'
+        }
+      },
+      { $sort: { year: 1, '_id.month': 1 } }
+    ]);
+
+    res.json(monthlyTrends);
+  } catch (error) {
+    console.error('Monthly trends error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get('/:companyId/analytics/category-analysis', authenticate, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { dateFrom, dateTo, status, standard, type } = req.query;
+
+    const matchStage = { companyId: new mongoose.Types.ObjectId(companyId) };
+
+    if (dateFrom && dateTo) {
+      matchStage.scheduledDate = { $gte: new Date(dateFrom), $lte: new Date(dateTo) };
+    }
+    if (status) matchStage.status = status;
+    if (standard) matchStage.standard = standard;
+    if (type) matchStage.type = type;
+
+    const categoryAnalysis = await Audit.aggregate([
+      { $match: matchStage },
+      { $unwind: "$checklist" },
+
+      {
+        $group: {
+          _id: "$checklist.categoryName",
+          totalQuestions: { $sum: 1 },
+          answeredQuestions: { $sum: { $cond: [{ $ne: ["$checklist.answer", null] }, 1, 0] } },
+          yesAnswers: { $sum: { $cond: [{ $eq: ["$checklist.answer", "yes"] }, 1, 0] } },
+          noAnswers: { $sum: { $cond: [{ $eq: ["$checklist.answer", "no"] }, 1, 0] } },
+          naAnswers: { $sum: { $cond: [{ $eq: ["$checklist.answer", "na"] }, 1, 0] } }
+        }
+      },
+
+      {
+        $project: {
+          category: "$_id",
+          observations: "$noAnswers",
+
+          compliance: {
+            $round: [
+              {
+                $multiply: [
+                  {
+                    $divide: [
+                      { $add: ["$yesAnswers", "$naAnswers"] },
+                      "$totalQuestions"
+                    ]
+                  },
+                  100
+                ]
+              },
+              0
+            ]
+          },
+
+          totalQuestions: "$totalQuestions",
+          answeredQuestions: "$answeredQuestions",
+          maxValue: { $max: ["$noAnswers", 100] }
+        }
+      },
+
+      { $match: { category: { $ne: null } } },
+      { $sort: { observations: -1 } }
+    ]);
+
+    res.json(categoryAnalysis);
+
+  } catch (error) {
+    console.error("Category analysis error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+
+// Compliance Heatmap (Clause vs Area)
+router.get('/:companyId/analytics/compliance-heatmap', authenticate, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { dateFrom, dateTo, status, standard, type } = req.query;
+    const matchStage = { companyId: new mongoose.Types.ObjectId(companyId) };
+
+    if (dateFrom && dateTo) {
+      matchStage.scheduledDate = { $gte: new Date(dateFrom), $lte: new Date(dateTo) };
+    }
+    if (status) matchStage.status = status;
+    if (standard) matchStage.standard = standard;
+    if (type) matchStage.type = type;
+
+    const heatmapData = await Audit.aggregate([
+      { $match: matchStage },
+
+      // 🔹 AREA Lookup
+      {
+        $lookup: {
+          from: "areas",
+          localField: "areaId",
+          foreignField: "_id",
+          as: "area"
+        }
+      },
+      { $unwind: "$area" },
+
+      { $unwind: "$checklist" },
+
+      {
+        $match: {
+          "checklist.answer": "no",
+          "checklist.clause": { $ne: null }
+        }
+      },
+
+      {
+        $group: {
+          _id: {
+            areaId: "$areaId",
+            areaName: "$area.name",
+            clause: "$checklist.clause"
+          },
+          count: { $sum: 1 }
+        }
+      },
+
+      {
+        $group: {
+          _id: {
+            areaId: "$_id.areaId",
+            areaName: "$_id.areaName"
+          },
+          clauses: {
+            $push: {
+              clause: "$_id.clause",
+              count: "$count"
+            }
+          }
+        }
+      },
+
+      {
+        $project: {
+          areaId: "$_id.areaId",
+          areaName: "$_id.areaName",
+          clauses: {
+            $arrayToObject: {
+              $map: {
+                input: "$clauses",
+                as: "item",
+                in: { k: "$$item.clause", v: "$$item.count" }
+              }
+            }
+          }
+        }
+      }
+    ]);
+
+    // 📌 Distinct Clause Headers
+    const clauseHeaders = await Audit.aggregate([
+      { $match: matchStage },
+      { $unwind: "$checklist" },
+      { $match: { "checklist.clause": { $ne: null } } },
+      { $group: { _id: "$checklist.clause" } },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.json({
+      data: heatmapData,
+      clauseHeaders: clauseHeaders.map(c => c._id)
+    });
+
+  } catch (error) {
+    console.error("Heatmap error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+
+// Export dashboard data
+router.get('/:companyId/export/dashboard', authenticate, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { format = 'excel' } = req.query;
+
+    // This is a placeholder - implement your export logic here
+    // You can use libraries like exceljs, pdfkit, etc.
+    
+    res.status(501).json({ message: 'Export functionality not implemented yet' });
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;

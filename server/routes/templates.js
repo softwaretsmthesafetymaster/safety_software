@@ -34,6 +34,8 @@ const defaultTemplates = [
       }
     ]
   },
+
+  // FIRE SAFETY
   {
     name: 'Fire Safety Audit',
     code: 'FIRE_SAFETY',
@@ -43,21 +45,23 @@ const defaultTemplates = [
       {
         name: 'Fire Prevention Systems',
         questions: [
-          { id: 'FS_1_1', question: 'Are fire extinguishers properly installed and maintained?', element: 'Fire Equipment' },
-          { id: 'FS_1_2', question: 'Is the fire alarm system functional and tested regularly?', element: 'Alarm System' },
-          { id: 'FS_1_3', question: 'Are emergency exits clearly marked and unobstructed?', element: 'Emergency Exits' }
+          { id: 'FS_1_1', question: 'Are fire extinguishers properly installed and maintained?', clause: '4.2.1', element: 'Fire Equipment' },
+          { id: 'FS_1_2', question: 'Is the fire alarm system functional and tested regularly?', clause: '4.2.2', element: 'Alarm System' },
+          { id: 'FS_1_3', question: 'Are emergency exits clearly marked and unobstructed?', clause: '4.2.3', element: 'Emergency Exits' }
         ]
       },
       {
         name: 'Fire Detection and Suppression',
         questions: [
-          { id: 'FS_2_1', question: 'Are smoke detectors installed and functioning properly?', element: 'Detection System' },
-          { id: 'FS_2_2', question: 'Is the sprinkler system operational and regularly tested?', element: 'Suppression System' },
-          { id: 'FS_2_3', question: 'Are fire hydrants accessible and in working condition?', element: 'Hydrant System' }
+          { id: 'FS_2_1', question: 'Are smoke detectors installed and functioning properly?', clause: '4.3.1', element: 'Detection System' },
+          { id: 'FS_2_2', question: 'Is the sprinkler system operational and regularly tested?', clause: '4.3.2', element: 'Suppression System' },
+          { id: 'FS_2_3', question: 'Are fire hydrants accessible and in working condition?', clause: '4.3.3', element: 'Hydrant System' }
         ]
       }
     ]
   },
+
+  // ELECTRICAL SAFETY
   {
     name: 'Electrical Safety Audit',
     code: 'ELECTRICAL_SAFETY',
@@ -67,21 +71,23 @@ const defaultTemplates = [
       {
         name: 'Electrical Installation',
         questions: [
-          { id: 'ES_1_1', question: 'Are all electrical installations compliant with local codes?', element: 'Installation' },
-          { id: 'ES_1_2', question: 'Is proper earthing/grounding provided for all equipment?', element: 'Grounding' },
-          { id: 'ES_1_3', question: 'Are electrical panels properly labeled and accessible?', element: 'Panels' }
+          { id: 'ES_1_1', question: 'Are all electrical installations compliant with local codes?', clause: '6.1.1', element: 'Installation' },
+          { id: 'ES_1_2', question: 'Is proper earthing/grounding provided for all equipment?', clause: '6.1.2', element: 'Grounding' },
+          { id: 'ES_1_3', question: 'Are electrical panels properly labeled and accessible?', clause: '6.1.3', element: 'Panels' }
         ]
       },
       {
         name: 'Electrical Safety Measures',
         questions: [
-          { id: 'ES_2_1', question: 'Are GFCI/RCD devices installed where required?', element: 'Protection Devices' },
-          { id: 'ES_2_2', question: 'Is lockout/tagout procedure implemented for electrical work?', element: 'LOTO' },
-          { id: 'ES_2_3', question: 'Are electrical workers trained and certified?', element: 'Training' }
+          { id: 'ES_2_1', question: 'Are GFCI/RCD devices installed where required?', clause: '6.2.1', element: 'Protection Devices' },
+          { id: 'ES_2_2', question: 'Is lockout/tagout procedure implemented for electrical work?', clause: '6.2.2', element: 'LOTO' },
+          { id: 'ES_2_3', question: 'Are electrical workers trained and certified?', clause: '6.2.3', element: 'Training' }
         ]
       }
     ]
   },
+
+  // ISO 45001
   {
     name: 'ISO 45001:2018 - Occupational Health & Safety',
     code: 'ISO45001',
@@ -106,6 +112,8 @@ const defaultTemplates = [
       }
     ]
   },
+
+  // PSM
   {
     name: 'Process Safety Management (PSM)',
     code: 'PSM',
@@ -115,21 +123,23 @@ const defaultTemplates = [
       {
         name: 'Process Safety Information',
         questions: [
-          { id: 'PSM_1_1', question: 'Is process safety information documented and current?', element: 'PSI' },
-          { id: 'PSM_1_2', question: 'Are process hazard analyses conducted and updated?', element: 'PHA' },
-          { id: 'PSM_1_3', question: 'Are operating procedures written and followed?', element: 'Procedures' }
+          { id: 'PSM_1_1', question: 'Is process safety information documented and current?', clause: '3.1.1', element: 'PSI' },
+          { id: 'PSM_1_2', question: 'Are process hazard analyses conducted and updated?', clause: '3.1.2', element: 'PHA' },
+          { id: 'PSM_1_3', question: 'Are operating procedures written and followed?', clause: '3.1.3', element: 'Procedures' }
         ]
       },
       {
         name: 'Emergency Planning',
         questions: [
-          { id: 'PSM_2_1', question: 'Is an emergency action plan developed and implemented?', element: 'Emergency Plan' },
-          { id: 'PSM_2_2', question: 'Are emergency response drills conducted regularly?', element: 'Drills' },
-          { id: 'PSM_2_3', question: 'Is incident investigation procedure established?', element: 'Investigation' }
+          { id: 'PSM_2_1', question: 'Is an emergency action plan developed and implemented?', clause: '3.2.1', element: 'Emergency Plan' },
+          { id: 'PSM_2_2', question: 'Are emergency response drills conducted regularly?', clause: '3.2.2', element: 'Drills' },
+          { id: 'PSM_2_3', question: 'Is incident investigation procedure established?', clause: '3.2.3', element: 'Investigation' }
         ]
       }
     ]
   },
+
+  // AI SAFETY
   {
     name: 'AI Safety Audit',
     code: 'AI_SAFETY',
@@ -139,22 +149,24 @@ const defaultTemplates = [
       {
         name: 'AI Governance',
         questions: [
-          { id: 'AI_1_1', question: 'Is there an AI governance framework in place?', element: 'Governance' },
-          { id: 'AI_1_2', question: 'Are AI systems regularly monitored for bias and fairness?', element: 'Bias Monitoring' },
-          { id: 'AI_1_3', question: 'Is there transparency in AI decision-making processes?', element: 'Transparency' }
+          { id: 'AI_1_1', question: 'Is there an AI governance framework in place?', clause: '8.1.1', element: 'Governance' },
+          { id: 'AI_1_2', question: 'Are AI systems regularly monitored for bias and fairness?', clause: '8.1.2', element: 'Bias Monitoring' },
+          { id: 'AI_1_3', question: 'Is there transparency in AI decision-making processes?', clause: '8.1.3', element: 'Transparency' }
         ]
       },
       {
         name: 'Data Security and Privacy',
         questions: [
-          { id: 'AI_2_1', question: 'Are data privacy measures implemented for AI systems?', element: 'Privacy' },
-          { id: 'AI_2_2', question: 'Is data used for AI training properly secured?', element: 'Data Security' },
-          { id: 'AI_2_3', question: 'Are AI model outputs validated and verified?', element: 'Validation' }
+          { id: 'AI_2_1', question: 'Are data privacy measures implemented for AI systems?', clause: '8.2.1', element: 'Privacy' },
+          { id: 'AI_2_2', question: 'Is data used for AI training properly secured?', clause: '8.2.2', element: 'Data Security' },
+          { id: 'AI_2_3', question: 'Are AI model outputs validated and verified?', clause: '8.2.3', element: 'Validation' }
         ]
       }
     ]
   }
 ];
+
+
 
 // Initialize default templates
 router.post('/initialize-defaults/:companyId', authenticate, checkCompanyAccess, async (req, res) => {

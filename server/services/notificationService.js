@@ -1,400 +1,298 @@
-import Notification from '../models/Notification.js'
-import emailService from './emailService.js'
+import Notification from '../models/Notification.js';
+import User from '../models/User.js';
+import logger from '../middleware/logger.js';
 
 class NotificationService {
-  /* ------------------ Core Notification Helpers ------------------ */
-
+  // Create a single notification
   async createNotification(data) {
     try {
-      const notification = new Notification(data)
-      await notification.save()
+      const notification = new Notification(data);
+      await notification.save();
 
-      if (data.sendEmail && data.userId) {
-        const User = (await import('../models/User.js')).default
-        const user = await User.findById(data.userId)
-        if (user && user.email) {
-          await this.sendEmailNotification(notification, user)
-        }
-      }
+      // Log notification creation
+      logger.info('Notification created', {
+        notificationId: notification._id,
+        type: notification.type,
+        userId: notification.userId,
+        companyId: notification.companyId
+      });
 
-      return notification
+      return notification;
     } catch (error) {
-      console.error('Error creating notification:', error)
-      throw error
+      logger.error('Failed to create notification', { error: error.message, data });
+      throw error;
     }
   }
 
+  // Create multiple notifications
   async createBulkNotifications(notifications) {
     try {
-      const created = await Notification.insertMany(notifications)
-      const User = (await import('../models/User.js')).default
+      const result = await Notification.insertMany(notifications);
+      
+      logger.info('Bulk notifications created', {
+        count: result.length,
+        companyId: notifications[0]?.companyId
+      });
 
-      for (const n of created) {
-        if (n.sendEmail && n.userId) {
-          const user = await User.findById(n.userId)
-          if (user?.email) {
-            await this.sendEmailNotification(n, user)
-          }
-        }
-      }
-      return created
+      return result;
     } catch (error) {
-      console.error('Error creating bulk notifications:', error)
-      throw error
+      logger.error('Failed to create bulk notifications', { 
+        error: error.message, 
+        count: notifications.length 
+      });
+      throw error;
     }
   }
 
-  async sendEmailNotification(notification, user) {
+  // Send notification to specific users
+  async notifyUsers(userIds, notificationData, companyId) {
     try {
-      const subject = notification.title
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">SafetyPro</h1>
-          </div>
-          <div style="padding: 20px; background: #f8f9fa;">
-            <h2 style="color: #333;">${notification.title}</h2>
-            <p>${notification.message}</p>
-            <div style="margin: 20px 0; padding: 15px; background: ${this.getNotificationColor(
-              notification.type
-            )}; border-radius: 5px;">
-              <p style="margin: 0; color: #333;"><strong>Type:</strong> ${notification.type.toUpperCase()}</p>
-            </div>
-            <div style="text-align: center; margin: 20px 0;">
-              <a href="${process.env.FRONTEND_URL}/dashboard" 
-                 style="background: #2196f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                View in SafetyPro
-              </a>
-            </div>
-          </div>
-          <div style="background: #333; color: white; padding: 10px; text-align: center; font-size: 12px;">
-            <p>This is an automated message from SafetyPro. Please do not reply to this email.</p>
-          </div>
-        </div>
-      `
-      await emailService.sendEmail(user.email, subject, html)
+      const notifications = userIds.map(userId => ({
+        ...notificationData,
+        userId,
+        companyId
+      }));
+
+      return await this.createBulkNotifications(notifications);
     } catch (error) {
-      console.error('Error sending email notification:', error)
+      logger.error('Failed to notify users', { 
+        error: error.message, 
+        userCount: userIds.length 
+      });
+      throw error;
     }
   }
 
-  getNotificationColor(type) {
-    const colors = {
-      info: '#e3f2fd',
-      success: '#e8f5e8',
-      warning: '#fff3cd',
-      error: '#ffebee',
-      reminder: '#f3e5f5'
-    }
-    return colors[type] || colors.info
-  }
+  // Send notification to all users in a company
+  async notifyCompany(companyId, notificationData) {
+    try {
+      const users = await User.find({ companyId, isActive: true }).select('_id');
+      const userIds = users.map(user => user._id);
 
-  /* ------------------ Permit Notifications ------------------ */
-
-  async notifyPermitSubmitted(permit, firstApproverId = null) {
-    const User = (await import('../models/User.js')).default
-    let approvers = []
-
-    if (firstApproverId) {
-      const u = await User.findById(firstApproverId)
-      if (u) approvers = [u]
-    } else {
-      approvers = await User.find({
-        companyId: permit.companyId,
-        role: { $in: ['safety_incharge', 'plant_head'] },
-        isActive: true
-      })
-    }
-
-    const notifications = approvers.map(user => ({
-      title: 'New Permit Submitted for Approval',
-      message: `Permit ${permit.permitNumber} has been submitted and requires your approval.`,
-      type: 'info',
-      userId: user._id,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_submitted'
-      },
-      sendEmail: true
-    }))
-
-    await this.createBulkNotifications(notifications)
-
-    const approverEmails = approvers.map(a => a.email).filter(Boolean)
-    if (approverEmails.length > 0) {
-      await emailService.sendPermitNotification(permit, 'Submitted for Approval', approverEmails)
+      return await this.notifyUsers(userIds, notificationData, companyId);
+    } catch (error) {
+      logger.error('Failed to notify company', { 
+        error: error.message, 
+        companyId 
+      });
+      throw error;
     }
   }
 
-  async notifyPermitPendingApproval(permit, approverId, role = '') {
-    if (!approverId) return
-    const notification = {
-      title: 'Permit Pending Your Approval',
-      message: `Permit ${permit.permitNumber} is pending your approval ${role ? 'as ' + role : ''}.`,
-      type: 'info',
-      userId: approverId,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_pending_approval'
+  // Send notification to users by role
+  async notifyByRole(companyId, roles, notificationData) {
+    try {
+      const users = await User.find({ 
+        companyId, 
+        role: { $in: roles }, 
+        isActive: true 
+      }).select('_id');
+      
+      const userIds = users.map(user => user._id);
+      return await this.notifyUsers(userIds, notificationData, companyId);
+    } catch (error) {
+      logger.error('Failed to notify by role', { 
+        error: error.message, 
+        companyId, 
+        roles 
+      });
+      throw error;
+    }
+  }
+
+  // Send notification to plant users
+  async notifyPlant(plantId, notificationData, companyId) {
+    try {
+      const users = await User.find({ 
+        plantId, 
+        companyId, 
+        isActive: true 
+      }).select('_id');
+      
+      const userIds = users.map(user => user._id);
+      return await this.notifyUsers(userIds, notificationData, companyId);
+    } catch (error) {
+      logger.error('Failed to notify plant', { 
+        error: error.message, 
+        plantId 
+      });
+      throw error;
+    }
+  }
+
+  // System notifications (no specific user)
+  async createSystemNotification(companyId, notificationData) {
+    try {
+      return await this.createNotification({
+        ...notificationData,
+        companyId,
+        type: 'system'
+      });
+    } catch (error) {
+      logger.error('Failed to create system notification', { 
+        error: error.message, 
+        companyId 
+      });
+      throw error;
+    }
+  }
+
+  // Mark notification as read
+  async markAsRead(notificationId, userId) {
+    try {
+      const notification = await Notification.findOneAndUpdate(
+        { _id: notificationId, userId },
+        { 
+          read: true, 
+          readAt: new Date() 
+        },
+        { new: true }
+      );
+
+      if (notification) {
+        logger.info('Notification marked as read', {
+          notificationId,
+          userId
+        });
       }
-    }
-    await this.createNotification(notification)
-  }
 
-  async notifyPermitApproved(permit) {
-    const notification = {
-      title: 'Permit Approved',
-      message: `Your permit ${permit.permitNumber} has been approved and is now active.`,
-      type: 'success',
-      userId: permit.requestedBy,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_approved'
-      }
-    }
-    await this.createNotification(notification)
-  }
-
-  async notifyPermitRejected(permit, comments) {
-    const notification = {
-      title: 'Permit Rejected',
-      message: `Your permit ${permit.permitNumber} was rejected. Comments: ${comments || 'N/A'}`,
-      type: 'error',
-      userId: permit.requestedBy,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_rejected'
-      }
-    }
-    await this.createNotification(notification)
-  }
-
-  async notifyPermitClosed(permit) {
-    const notification = {
-      title: 'Permit Closed',
-      message: `Your permit ${permit.permitNumber} has been closed.`,
-      type: 'success',
-      userId: permit.requestedBy,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_closed'
-      }
-    }
-    await this.createNotification(notification)
-  }
-
-  async notifyPermitStopped(permit) {
-    const User = (await import('../models/User.js')).default
-    const safetyTeam = await User.find({
-      companyId: permit.companyId,
-      role: { $in: ['safety_incharge', 'plant_head', 'company_owner'] },
-      isActive: true
-    })
-
-    const notifications = safetyTeam.map(member => ({
-      title: 'URGENT: Permit Stopped',
-      message: `Permit ${permit.permitNumber} has been stopped due to safety concerns.`,
-      type: 'error',
-      userId: member._id,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_stopped'
-      }
-    }))
-    await this.createBulkNotifications(notifications)
-  }
-
-  async notifyPermitExpiring(permit) {
-    const User = (await import('../models/User.js')).default
-    const requestedBy = await User.findById(permit.requestedBy)
-    if (!requestedBy) return
-
-    const expiryDate = permit.expiresAt || permit.schedule?.endDate
-    const notification = {
-      title: 'Permit Expiring Soon',
-      message: `Permit ${permit.permitNumber} will expire on ${new Date(expiryDate).toLocaleString()}. Please take necessary action.`,
-      type: 'warning',
-      userId: requestedBy._id,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_expiring'
-      }
-    }
-    await this.createNotification(notification)
-
-    if (requestedBy.email) {
-      await emailService.sendReminderEmail(
-        { number: permit.permitNumber, dueDate: expiryDate, status: permit.status },
-        'Permit Expiring',
-        [requestedBy.email]
-      )
+      return notification;
+    } catch (error) {
+      logger.error('Failed to mark notification as read', { 
+        error: error.message, 
+        notificationId, 
+        userId 
+      });
+      throw error;
     }
   }
 
-  async notifyPermitExtended(permit, comments) {
-    const notification = {
-      title: 'Permit Extended',
-      message: `Permit ${permit.permitNumber} has been extended. Comments: ${comments || ''}`,
-      type: 'info',
-      userId: permit.requestedBy,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_extended'
-      }
-    }
-    await this.createNotification(notification)
-  }
+  // Mark all notifications as read for a user
+  async markAllAsRead(userId, companyId) {
+    try {
+      const result = await Notification.updateMany(
+        { 
+          userId, 
+          companyId, 
+          read: false 
+        },
+        { 
+          read: true, 
+          readAt: new Date() 
+        }
+      );
 
-  async notifyPermitActivated(permit) {
-    const notification = {
-      title: 'Permit Activated',
-      message: `Permit ${permit.permitNumber} is now active.`,
-      type: 'success',
-      userId: permit.requestedBy,
-      companyId: permit.companyId,
-      metadata: {
-        permitId: permit._id,
-        permitNumber: permit.permitNumber,
-        type: 'permit_activated'
-      }
-    }
-    await this.createNotification(notification)
-  }
+      logger.info('All notifications marked as read', {
+        userId,
+        companyId,
+        modifiedCount: result.modifiedCount
+      });
 
-  /* ------------------ Incident Notifications ------------------ */
-
-  async notifyIncidentReported(incident) {
-    const User = (await import('../models/User.js')).default
-    const safetyTeam = await User.find({
-      companyId: incident.companyId,
-      role: { $in: ['safety_incharge', 'plant_head'] },
-      isActive: true
-    })
-
-    const notifications = safetyTeam.map(member => ({
-      title: 'New Incident Reported',
-      message: `A ${incident.severity} severity incident has been reported: ${incident.incidentNumber}`,
-      type: incident.severity === 'critical' ? 'error' : 'warning',
-      userId: member._id,
-      companyId: incident.companyId,
-      metadata: {
-        incidentId: incident._id,
-        incidentNumber: incident.incidentNumber,
-        type: 'incident_reported'
-      }
-    }))
-    await this.createBulkNotifications(notifications)
-
-    const teamEmails = safetyTeam.map(m => m.email).filter(Boolean)
-    if (teamEmails.length > 0) {
-      await emailService.sendIncidentNotification(incident, 'Reported', teamEmails)
+      return result;
+    } catch (error) {
+      logger.error('Failed to mark all notifications as read', { 
+        error: error.message, 
+        userId, 
+        companyId 
+      });
+      throw error;
     }
   }
 
-  async notifyIncidentAssigned(incident, assignedTo) {
-    const notification = {
-      title: 'Incident Investigation Assigned',
-      message: `You have been assigned to investigate incident ${incident.incidentNumber}.`,
-      type: 'info',
-      userId: assignedTo,
-      companyId: incident.companyId,
-      metadata: {
-        incidentId: incident._id,
-        incidentNumber: incident.incidentNumber,
-        type: 'incident_assigned'
-      }
+  // Get notifications for a user
+  async getUserNotifications(userId, companyId, options = {}) {
+    try {
+      const { 
+        page = 1, 
+        limit = 20, 
+        unreadOnly = false,
+        type = null,
+        priority = null
+      } = options;
+
+      const filter = {
+        $or: [
+          { userId, companyId },
+          { userId: { $exists: false }, companyId }
+        ]
+      };
+
+      if (unreadOnly) filter.read = false;
+      if (type) filter.type = type;
+      if (priority) filter.priority = priority;
+
+      const notifications = await Notification.find(filter)
+        .sort({ createdAt: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .lean();
+
+      const total = await Notification.countDocuments(filter);
+      const unreadCount = await Notification.countDocuments({
+        ...filter,
+        read: false
+      });
+
+      return {
+        notifications,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        },
+        unreadCount
+      };
+    } catch (error) {
+      logger.error('Failed to get user notifications', { 
+        error: error.message, 
+        userId, 
+        companyId 
+      });
+      throw error;
     }
-    await this.createNotification(notification)
   }
 
-  /* ------------------ Audit Notifications ------------------ */
+  // Delete old notifications
+  async cleanupOldNotifications(daysToKeep = 30) {
+    try {
+      const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000);
+      
+      const result = await Notification.deleteMany({
+        createdAt: { $lt: cutoffDate },
+        read: true
+      });
 
-  async notifyAuditActionAssigned(audit, finding) {
-    const notification = {
-      title: 'Audit Corrective Action Assigned',
-      message: `You have been assigned a corrective action from audit ${audit.auditNumber}.`,
-      type: 'info',
-      userId: finding.correctiveAction.assignedTo,
-      companyId: audit.companyId,
-      metadata: {
-        auditId: audit._id,
-        auditNumber: audit.auditNumber,
-        findingId: finding._id,
-        type: 'audit_action_assigned'
-      }
+      logger.info('Old notifications cleaned up', {
+        deletedCount: result.deletedCount,
+        cutoffDate
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to cleanup old notifications', { 
+        error: error.message 
+      });
+      throw error;
     }
-    await this.createNotification(notification)
   }
 
-  /* ------------------ HAZOP Notifications ------------------ */
+  // Send limit warning notifications
+  async sendLimitWarning(companyId, resourceType, current, max, threshold = 0.8) {
+    if (current >= max * threshold) {
+      const warningData = {
+        title: `${resourceType} Limit Warning`,
+        message: `You are approaching your ${resourceType} limit. Current: ${current}/${max}`,
+        type: 'warning',
+        priority: current >= max * 0.9 ? 'high' : 'normal',
+        actionRequired: true,
+        actionText: 'Upgrade Plan',
+        actionUrl: '/subscription/upgrade'
+      };
 
-  async notifyHAZOPSessionScheduled(hazop, attendees) {
-    const notifications = attendees.map(attendee => ({
-      title: 'HAZOP Session Scheduled',
-      message: `A HAZOP session for study ${hazop.studyNumber} has been scheduled.`,
-      type: 'info',
-      userId: attendee,
-      companyId: hazop.companyId,
-      metadata: {
-        hazopId: hazop._id,
-        studyNumber: hazop.studyNumber,
-        type: 'hazop_session'
-      }
-    }))
-    await this.createBulkNotifications(notifications)
-  }
-
-  /* ------------------ System Notifications ------------------ */
-
-  async notifySystemMaintenance(companyId, message) {
-    const User = (await import('../models/User.js')).default
-    const users = await User.find({ companyId, isActive: true })
-
-    const notifications = users.map(user => ({
-      title: 'System Maintenance Notice',
-      message,
-      type: 'info',
-      userId: user._id,
-      companyId,
-      metadata: { type: 'system_maintenance' }
-    }))
-    await this.createBulkNotifications(notifications)
-  }
-
-  async notifyConfigurationChange(companyId, module, changes) {
-    const User = (await import('../models/User.js')).default
-    const admins = await User.find({
-      companyId,
-      role: { $in: ['company_owner', 'plant_head'] },
-      isActive: true
-    })
-
-    const notifications = admins.map(admin => ({
-      title: 'Configuration Updated',
-      message: `${module} module configuration has been updated. Changes: ${changes}`,
-      type: 'info',
-      userId: admin._id,
-      companyId,
-      metadata: { module, changes, type: 'config_change' }
-    }))
-    await this.createBulkNotifications(notifications)
+      await this.notifyByRole(companyId, ['company_owner'], warningData);
+    }
   }
 }
 
-export default new NotificationService()
+export default new NotificationService();

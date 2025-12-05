@@ -117,7 +117,6 @@ const ObservationForm: React.FC = () => {
       });
       
       const data = await response.data;
-      console.log(data)
       if (data.suggestions) {
         setAiSuggestions(data.suggestions);
         
